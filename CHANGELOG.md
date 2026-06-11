@@ -2,6 +2,20 @@
 
 > **Sprint 16 Wave 1 (v0.4.14.39, 2026-06-11)**: 从 `fuqing-crm-analytics/scraper/` 拆出独立 git repo。 跟主项目 ETL / 前端 / Sprint 16.x backend 改动**完全隔离**。
 
+## [v0.4.14.40] — 2026-06-12 (Sprint 16.5+1 — 文档补全 + 解耦准备)
+
+### Added
+- 5 文档同步 (隐式包含在 Sprint 16 Wave 1 commit 10ff8da, 但正式记录):
+  - `core/BUGFIX_2026-04-06.md` (Sprint 1 bugfix 记录)
+  - `core/MEMO_2026-05-26.md` (Sprint 1 内部备忘)
+  - `core/MEMO_2026-06-01.md` (Sprint 1 内部备忘)
+  - `core/MEMO_2026-06-02.md` (Sprint 1 内部备忘)
+  - `core/README-dmp-scraper-launchd.md` (launchd 调度文档)
+
+### Validation
+- `PYTHONPATH=. pytest core/tests/ -q`: 55 passed / 0 failed / 0 error / 0.04s (dmp_common.py Wave 1 re-export shim 完整)
+- 独立 repo 跟主项目**完全解耦**, 5 个 580+ 行单文件 (主项目) 留 Sprint 19+ 治理 #143 清理
+
 ## [v0.4.14.39] — 2026-06-11 (Sprint 16 Wave 1 — 独立 repo 拆出 + 拆分重构)
 
 ### 🎯 摘要
