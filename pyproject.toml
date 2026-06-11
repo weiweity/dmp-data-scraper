@@ -1,0 +1,68 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fuqing-scraper"
+version = "0.4.14.39"
+description = "芙清 DMP 数据采集 (达摩盘自动抓数, 从 fuqing-crm-analytics 拆出独立 repo)"
+requires-python = ">=3.13"
+dependencies = [
+    "playwright>=1.40.0",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=9.0.0",
+    "pytest-mock>=3.12.0",
+    "ruff>=0.5.0",
+]
+
+[tool.uv]
+python-preference = "only-managed"
+
+# ── pytest 配置 (独立, 不跟主项目根 pyproject.toml 共享) ───────────
+# Sprint 16 Wave 1: 独立 repo 拆出后, scraper 有自己的 pytest 配置
+# - testpaths 限定到 core/tests/, 不扫根 tests/ 或其他目录
+# - addopts 跟主项目一致 (-ra 显示跳过原因, --strict-markers 严格 marker)
+[tool.pytest.ini_options]
+testpaths = ["core/tests"]
+addopts = ["-ra", "--strict-markers", "--disable-warnings"]
+
+# ── ruff 配置 ────────────────────────────────────────────────────
+# 跟主项目 fuqing-crm-analytics/pyproject.toml 几乎一致, 但 per-file-ignores
+# 针对 scraper/core/* 调整 (不列 backend/, frontend/, scripts/ 等主项目路径)
+[tool.ruff]
+line-length = 120
+exclude = ["chrome_profile/*", "del/*", ".venv/*", "__pycache__/*"]
+
+[tool.ruff.lint]
+# Enable: E (pycodestyle errors) + W (warnings) + F (pyflakes) + I (isort)
+select = ["E", "W", "F", "I"]
+# 跟主项目一致的 6 个 ignore (F401 imported but unused, E402 module level import
+# not at top, F541 f-string without any placeholders, F811 redefined, F841
+# unused variable)
+ignore = [
+    "E501",  # line too long (允许 long URL / 长字符串)
+]
+
+[tool.ruff.lint.per-file-ignores]
+# scraper 专属: scraper/core/* 文件常因业务原因 (sys.path.insert 必须在 import 前,
+# debug 截图保存用 print) 出现 E402 / F541 等, 局部 ignore
+"core/dmp_master.py" = ["E402", "F541"]  # sys.path.insert + 大量 print
+"core/dmp_common.py" = ["E402"]  # sys.path.insert + re-export shim
+"core/dmp_scraper.py" = ["E402", "F541"]  # 同 master
+"core/dmp_flow_scraper.py" = ["E402", "F541"]  # 同 master
+"core/dmp_item_insight_scraper.py" = ["E402", "F541"]  # 327 行 procedure, 大量 print
+"core/sanity_check.py" = ["E402", "F541"]  # 同上
+"core/run.sh" = ["E402"]
+"core/tests/*.py" = ["E402"]  # conftest.py 需 sys.path.insert
+"core/tests/test_*.py" = ["F841"]  # 测试变量未使用 (pytest fixture 注入)
+
+# ── 依赖锁定 ────────────────────────────────────────────────────
+# 跟主项目 [tool.uv] 一致, 但本项目是 scraper 独立 repo, 不再引用主项目
+
+[tool.uv.sources]
+# 未来如果主项目作为 library 提供, 可加 fuqing-crm-analytics = { path = "../fuqing-crm-analytics" }
+# 但 Sprint 16 Wave 1 拆出时, scraper 跟主项目无 import 关系, 不需要
