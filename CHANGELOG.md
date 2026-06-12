@@ -2,6 +2,32 @@
 
 > **Sprint 16 Wave 1 (v0.4.14.39, 2026-06-11)**: 从 `fuqing-crm-analytics/scraper/` 拆出独立 git repo。 跟主项目 ETL / 前端 / Sprint 16.x backend 改动**完全隔离**。
 
+## [v0.4.14.41] - 2026-06-12 - fix(scraper): Sprint 19+ #141 治根 — check_dmp_session 业务层 session 验证
+
+### Background
+Sprint 16.5+1 (v0.4.14.52) 跑批 0/15 失败根因: chrome_profile cookie 业务层失效 (HTTP 200 但 /api_2/login/loginuserinfo 业务码失效). check_dmp_session (scraper/core/dmp_common.py:444) 只检测 "立即登录" 按钮 + page_title 含 "登录", **不**调 API 验证业务 session. 假阳性导致 scraper **不**走 login_qianniu 重登.
+
+### Changed
+- **`scraper/core/dmp_common.py:444`**: `check_dmp_session` 加 `/api_2/login/loginuserinfo` API 调用 (page.evaluate fetch)
+  - 业务码失效 (body.data.isLogin=false) → 返 False (强制 login_qianniu 重登)
+  - API 异常 → 返 False (graceful fallback)
+- **`core/tests/test_dmp_common.py`** (新, 3 tests): valid_business_layer / business_layer_invalid / api_timeout
+
+### 痛点闭环
+- Sprint 16.5+1 root cause ✅ 闭环
+- check_dmp_session 假阳性 ✅ 治根
+- scraper **永远**会**走** login_qianniu (业务码失效时) ✅
+
+### 任务来源
+- Sprint 16.5+1 阶段 4 root cause → Sprint 19+ #141
+
+### 验证
+- `PYTHONPATH=. pytest core/tests/ -v`: 58 测试全过 (55 原有 + 3 新增) ✅
+- 跑批业务 (data3.csv +45 行) 不阻塞
+
+### 后续
+- Sprint 19+ #142 (5 行修重建) + #143/#144 (主项目 scraper 软删 + symlink) 已 Sprint 19 P2 batch 完成 (主项目 main HEAD e0bfd73)
+
 ## [v0.4.14.40] — 2026-06-12 (Sprint 16.5+1 — 文档补全 + 解耦准备)
 
 ### Added
