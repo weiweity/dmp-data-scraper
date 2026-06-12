@@ -19,7 +19,7 @@ const envCheck = await agent(`
   3. 检查 Python 依赖是否安装
   4. 检查数据文件状态（data.csv, data2.csv, data3.csv）
 
-  项目路径：/Users/hutou/Desktop/work plat/DMP_test_package/core/
+  项目路径：/Users/hutou/Desktop/fuqin-date/fuqing-scraper/core/
 
   请提供环境检查报告，包括：
   - 环境状态
@@ -34,7 +34,7 @@ const assetsResult = await agent(`
 
   执行命令：python3 dmp_master.py --assets
 
-  项目路径：/Users/hutou/Desktop/work plat/DMP_test_package/core/
+  项目路径：/Users/hutou/Desktop/fuqin-date/fuqing-scraper/core/
 
   采集要求：
   - 确保登录状态有效
@@ -52,7 +52,7 @@ const flowResult = await agent(`
 
   执行命令：python3 dmp_master.py --flow
 
-  项目路径：/Users/hutou/Desktop/work plat/DMP_test_package/core/
+  项目路径：/Users/hutou/Desktop/fuqin-date/fuqing-scraper/core/
 
   采集要求：
   - 确保登录状态有效
@@ -70,7 +70,7 @@ const itemsResult = await agent(`
 
   执行命令：python3 dmp_master.py --items
 
-  项目路径：/Users/hutou/Desktop/work plat/DMP_test_package/core/
+  项目路径：/Users/hutou/Desktop/fuqin-date/fuqing-scraper/core/
 
   采集要求：
   - 确保登录状态有效
@@ -94,7 +94,7 @@ const dataValidation = await agent(`
   4. 检查数据格式是否正确
   5. 检查是否有缺失日期
 
-  项目路径：/Users/hutou/Desktop/work plat/DMP_test_package/core/
+  项目路径：/Users/hutou/Desktop/fuqin-date/fuqing-scraper/core/
 
   验证要求：
   - 检查最近7天的数据是否完整
@@ -116,7 +116,7 @@ const syncReport = await agent(`
   2. 检查数据同步状态
   3. 生成数据同步报告
 
-  项目路径：/Users/hutou/Desktop/work plat/DMP_test_package/core/
+  项目路径：/Users/hutou/Desktop/fuqin-date/fuqing-scraper/core/
 
   报告内容：
   - 采集时间

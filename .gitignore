@@ -48,6 +48,8 @@ del/
 *.xlsx
 completed_items.json
 completed_items*.json
+**/completed_items.json
+**/completed_items*.json
 ai_config.json
 .ruff_cache/
 .playwright-cli/

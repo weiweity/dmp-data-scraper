@@ -14,7 +14,7 @@ phase('数据采集')
 const dataCollection = await agent(`
   读取并分析 data3.csv 的全部数据：
 
-  1. 读取 /Users/hutou/Desktop/work plat/DMP_test_package/core/data3.csv
+  1. 读取 /Users/hutou/Desktop/fuqin-date/fuqing-scraper/core/data3.csv
   2. 统计总行数、列数
   3. 列出所有日期
   4. 列出所有商品 ID

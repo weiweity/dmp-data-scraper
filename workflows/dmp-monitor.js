@@ -18,7 +18,7 @@ const statusCheck = await agent(`
   3. 检查错误日志
   4. 检查系统资源使用情况
 
-  项目路径：/Users/hutou/Desktop/work plat/DMP_test_package/core/
+  项目路径：/Users/hutou/Desktop/fuqin-date/fuqing-scraper/core/
 
   检查内容：
   - 最近24小时的运行日志
@@ -43,7 +43,7 @@ const dataQuality = await agent(`
   3. 检查数据一致性
   4. 检查异常数据
 
-  项目路径：/Users/hutou/Desktop/work plat/DMP_test_package/core/
+  项目路径：/Users/hutou/Desktop/fuqin-date/fuqing-scraper/core/
 
   检查内容：
   - 最近7天的数据完整性
@@ -68,7 +68,7 @@ const alertGeneration = await agent(`
   3. 生成告警报告
   4. 提供建议的后续步骤
 
-  项目路径：/Users/hutou/Desktop/work plat/DMP_test_package/core/
+  项目路径：/Users/hutou/Desktop/fuqin-date/fuqing-scraper/core/
 
   告警内容：
   - 运行状态异常

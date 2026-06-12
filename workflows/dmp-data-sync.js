@@ -18,7 +18,7 @@ const dataCheck = await agent(`
   3. 检查 data3.csv 的最后更新时间和数据量
   4. 检查数据格式是否正确
 
-  项目路径：/Users/hutou/Desktop/work plat/DMP_test_package/core/
+  项目路径：/Users/hutou/Desktop/fuqin-date/fuqing-scraper/core/
 
   请提供数据检查报告，包括：
   - 各数据文件的最后更新时间
@@ -37,7 +37,7 @@ const dataSync = await agent(`
   3. 复制 data3.csv 到指定目录
   4. 生成同步日志
 
-  项目路径：/Users/hutou/Desktop/work plat/DMP_test_package/core/
+  项目路径：/Users/hutou/Desktop/fuqin-date/fuqing-scraper/core/
 
   同步要求：
   - 保留历史数据
@@ -60,7 +60,7 @@ const syncValidation = await agent(`
   3. 检查数据格式是否一致
   4. 生成验证报告
 
-  项目路径：/Users/hutou/Desktop/work plat/DMP_test_package/core/
+  项目路径：/Users/hutou/Desktop/fuqin-date/fuqing-scraper/core/
 
   验证要求：
   - 检查数据完整性

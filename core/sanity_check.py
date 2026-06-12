@@ -66,6 +66,8 @@ def _send_lark_alert(content: str, open_id: str | None = None,
     oid = (open_id or os.environ.get("LARK_OPEN_ID", "")).strip()
     if not oid:
         return False, "未配置 LARK_OPEN_ID，跳过告警（不报错）"
+    if oid == "ou_xxx":
+        return False, "LARK_OPEN_ID 仍是 .env.example 占位符 (ou_xxx)，请 cp .env.example .env 后填入真实 open_id"
 
     bin_path = (
         lark_bin

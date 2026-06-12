@@ -18,7 +18,7 @@ const codeReview = await agent(`
   4. CSV 写入接口统一性
   5. 其他代码质量问题
 
-  项目路径：/Users/hutou/Desktop/work plat/DMP_test_package/core/
+  项目路径：/Users/hutou/Desktop/fuqin-date/fuqing-scraper/core/
 
   请提供详细的审核报告，包括：
   - 问题描述
@@ -36,7 +36,7 @@ const fixResult = await agent(`
   2. 消除重复日志输出
   3. 日志初始化优化
 
-  项目路径：/Users/hutou/Desktop/work plat/DMP_test_package/core/
+  项目路径：/Users/hutou/Desktop/fuqin-date/fuqing-scraper/core/
 
   修复要求：
   - 只修改必要的代码
@@ -60,7 +60,7 @@ const testResult = await agent(`
   3. 验证日志功能是否正常
   4. 验证 CSV 读写功能是否正常
 
-  项目路径：/Users/hutou/Desktop/work plat/DMP_test_package/core/
+  项目路径：/Users/hutou/Desktop/fuqin-date/fuqing-scraper/core/
 
   验证步骤：
   - 使用 python3 -m py_compile 检查语法
