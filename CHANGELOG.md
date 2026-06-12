@@ -184,7 +184,7 @@ Sprint 16 Wave 1 把 DMP 数据采集工具从主项目 `fuqing-crm-analytics/sc
 ### 🛠️ 变更内容
 
 #### Added (新增)
-- 独立 git repo `/Users/hutou/Desktop/fuqin date/fuqing-scraper/` (从主项目物理拆出)
+- 独立 git repo `/Users/hutou/Desktop/fuqin-date/fuqing-scraper/` (从主项目物理拆出)
 - 独立 `pyproject.toml` (含 `[tool.uv]` + `[tool.ruff]` + `[tool.pytest.ini_options]`, 跟主项目解耦)
 - 独立 `CLAUDE.md` (scraper-only 行为规则, 不引用主项目 backend 规则)
 - 独立 `.gitignore` (排除 `chrome_profile/`, `data*.csv`, `account.txt`, `del/`)

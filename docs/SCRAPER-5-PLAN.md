@@ -13,7 +13,7 @@ Sprint 4 改名收口 (v0.4.14.43 5 件文档改名 + 5 工单 Task #15-#19 → 
 ## 6 工单 (按执行顺序)
 
 ### P0 #25 Sprint 19+ #141 修复同步到外层 (新发现, 紧急)
-- **路径**: /Users/hutou/Desktop/fuqin date/fuqing-scraper
+- **路径**: /Users/hutou/Desktop/fuqin-date/fuqing-scraper
 - **根因**: 
   - commit da6240b (v0.4.14.41) 改的是 `scraper/core/dmp_common.py` (内层)
   - 生产 `core/dmp_master.py:30` 解析到 `core/dmp_common.py` (外层, 30413 字节, 无修复)
@@ -30,12 +30,12 @@ Sprint 4 改名收口 (v0.4.14.43 5 件文档改名 + 5 工单 Task #15-#19 → 
 - **执行**: Sprint 5 第 1 工单 (本 PR)
 
 ### P0 #20 主项目 scraper/ 软删 + symlink
-- **路径**: /Users/hutou/Desktop/fuqin date/fuqing-crm-analytics
+- **路径**: /Users/hutou/Desktop/fuqin-date/fuqing-crm-analytics
 - **修正**: 之前错报"已软删", 实际还有 (13 子目录, 6/8 15:13)
 - **步骤**:
   1. 切 fix/sprint20-143-scraper-soft-delete 分支 from main 9bd4274
   2. mv scraper scraper.legacy
-  3. ln -s /Users/hutou/Desktop/fuqin date/fuqing-scraper scraper
+  3. ln -s /Users/hutou/Desktop/fuqin-date/fuqing-scraper scraper
   4. 验证 (python3 -c "from scraper.core import dmp_common; print('OK')")
   5. 跑 pytest backend/tests/ 验证 507 passed
   6. 走 12 步流程 + CHANGELOG v0.4.14.55
@@ -44,7 +44,7 @@ Sprint 4 改名收口 (v0.4.14.43 5 件文档改名 + 5 工单 Task #15-#19 → 
 - **执行**: Sprint 5 第 2 工单 (可跟 #22 / #23 并行)
 
 ### P1 #21 独立 repo 双层 scraper/ 清理
-- **路径**: /Users/hutou/Desktop/fuqin date/fuqing-scraper
+- **路径**: /Users/hutou/Desktop/fuqin-date/fuqing-scraper
 - **问题**: `/scraper/core/` 跟 `/core/` 内容部分重叠 (Sprint 16 Wave 1 拆出时外层 scraper/ 没清理)
 - **决策翻转**: 
   - 计划说"大概率外层 scraper/ 全删" (v0.4.14.42 plan 阶段误判)
@@ -65,7 +65,7 @@ Sprint 4 改名收口 (v0.4.14.43 5 件文档改名 + 5 工单 Task #15-#19 → 
 - **执行**: Sprint 5 第 3 工单 ✅ completed (v0.4.14.46)
 
 ### P2 #22 5 行修 dmp_master.py:678 重建 + commit
-- **路径**: /Users/hutou/Desktop/fuqin date/fuqing-scraper
+- **路径**: /Users/hutou/Desktop/fuqin-date/fuqing-scraper
 - **状态**: 5 行修未真正 commit, 7 个 dangling 都没 marker
 - **步骤**:
   1. 用户回忆 5 行内容
@@ -83,7 +83,7 @@ Sprint 4 改名收口 (v0.4.14.43 5 件文档改名 + 5 工单 Task #15-#19 → 
 - **问题**: 1.1 写"项目路径 fuqing-crm-analytics/scraper/core/data3.csv" 跟实际状态 100% 不一致
 - **步骤**:
   1. 读简历文档 (2026-06-07 状态)
-  2. 跟新 1.1 路径 (主项目部分) → /Users/hutou/Desktop/fuqin date/fuqing-scraper/core/
+  2. 跟新 1.1 路径 (主项目部分) → /Users/hutou/Desktop/fuqin-date/fuqing-scraper/core/
   3. 跟新 1.2 状态 (主项目 9bd4274 软删 scraper/ + Sprint 19+ P2 batch)
   4. 跟新 1.4 核心约束 (Sprint 19+ #141 治根 check_dmp_session 业务层 session 验证, **含 #25 修复同步到外层**)
   5. 跟新 8.2 项目事实 (独立 repo v0.4.14.45+, 58/58 pytest, 22 模块)

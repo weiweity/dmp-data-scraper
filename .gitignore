@@ -53,6 +53,8 @@ ai_config.json
 .playwright-cli/
 .codebuddy/
 .workbuddy/
+.claude/
+.codegraph/
 
 # Logs
 *.log

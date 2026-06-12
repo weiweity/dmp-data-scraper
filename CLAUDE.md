@@ -10,10 +10,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 | 维度 | 值 |
 |---|---|
-| 项目路径 | `/Users/hutou/Desktop/fuqin date/fuqing-scraper` |
+| 项目路径 | `/Users/hutou/Desktop/fuqin-date/fuqing-scraper` |
 | GitHub | `git@github.com:weiweity/dmp-data-scraper.git` (main = `06cc0f3`) |
 | 版本 | **v0.4.14.41** (2026-06-12, Sprint 19+ #141 治根) |
-| 父项目 | `fuqing-crm-analytics` (主项目 9bd4274, scraper/ 已软删) |
+| 父项目 | `fuqing-crm-analytics` (主项目 `scraper/` 目录仍保留, 尚未完成软删 + symlink; 仅被 `scripts/etl/notify.py` 引用) |
 | 跨子项目依赖 | **B1 治根 v0.4.14.53** (lark 通道 ETL 自治) |
 | pytest | **58/58 passed** (55 原有 + 3 Sprint 19+ #141 新增) |
 | 跑批业务 | data3.csv 7164 → 7209 (+45 行, 0 行污染, 6/9-6/11 全部补完) |
@@ -211,7 +211,7 @@ Workflow({scriptPath: "workflows/dmp-monitor.js"})        # 监控告警
 Workflow({scriptPath: "workflows/dmp-optimization.js"})   # 优化执行
 ```
 
-⚠️ **路径不一致**: workflow JS 硬编码路径 `/Users/hutou/Desktop/work plat/DMP_test_package/core/`, 跟当前项目 `/Users/hutou/Desktop/fuqin date/fuqing-scraper/core/` **不**一致, 需更新后才能直接执行。
+⚠️ **路径不一致**: workflow JS 硬编码路径 `/Users/hutou/Desktop/work plat/DMP_test_package/core/`, 跟当前项目 `/Users/hutou/Desktop/fuqin-date/fuqing-scraper/core/` **不**一致, 需更新后才能直接执行。
 
 ---
 

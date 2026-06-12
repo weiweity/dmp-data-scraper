@@ -7,9 +7,9 @@
 
 独立 git repo, 22 模块拆分, 跟主项目 ETL/前端/Sprint 16.x backend 改动完全隔离。
 
-- **项目路径**: `/Users/hutou/Desktop/fuqin date/fuqing-scraper`
+- **项目路径**: `/Users/hutou/Desktop/fuqin-date/fuqing-scraper`
 - **GitHub**: `git@github.com:weiweity/dmp-data-scraper.git` (main = `06cc0f3`)
-- **父项目**: `fuqing-crm-analytics` (主项目 9bd4274, scraper/ 已软删)
+- **父项目**: `fuqing-crm-analytics` (主项目 `scraper/` 目录仍保留, 尚未完成软删 + symlink; 仅被 `scripts/etl/notify.py` 引用)
 - **跨子项目依赖**: **B1 治根 v0.4.14.53** (lark 通道 ETL 自治)
 - **pytest**: **58/58 passed** (55 原有 + 3 Sprint 19+ #141 新增)
 - **跑批业务**: data3.csv 7164 → 7209 (+45 行, 0 行污染, 6/9-6/11 全部补完)
