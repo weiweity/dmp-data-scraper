@@ -2,15 +2,39 @@
 
 > **Sprint 16 Wave 1 (v0.4.14.39, 2026-06-11)**: 从 `fuqing-crm-analytics/scraper/` 拆出独立 git repo。 跟主项目 ETL / 前端 / Sprint 16.x backend 改动**完全隔离**。
 
-## [v0.4.14.42] - 2026-06-12 - docs: Sprint 20+ 文档补全 (README 跟新 + SCRAPER-20-PLAN + SCRAPER-20-RETROSPECTIVE)
+## [v0.4.14.43] - 2026-06-12 - chore: Sprint 4 改名 + Sprint 5 5 工单 Task #20-#24 编号
+
+### 背景
+Sprint 20+ 命名跟主项目 fuqing-crm-analytics Sprint 20+ 重复造成迷惑, 改名 Sprint 4 (跟 Sprint 1-3 连续, 独立 repo 自己迭代计数).
+
+### Changed
+- **README.md**: Sprint 20+ → Sprint 4
+- **docs/SCRAPER-20-PLAN.md** → **docs/SCRAPER-4-PLAN.md** (git mv + sed 改内容)
+- **docs/SCRAPER-20-RETROSPECTIVE.md** → **docs/SCRAPER-4-RETROSPECTIVE.md** (git mv + sed 改内容)
+- **CHANGELOG.md**: Sprint 20+ → Sprint 4
+- **CLAUDE.md**: Sprint 20+ → Sprint 4
+
+### 5 工单 Task #15-#19 → Task #20-#24 (Sprint 5 编号)
+- Task #15 (#143 主项目软删) → Task #20 (Sprint 5 P0)
+- Task #16 (#145 双层清理) → Task #21 (Sprint 5 P1)
+- Task #17 (#142 5 行修) → Task #22 (Sprint 5 P2)
+- Task #18 (#147 简历跟新) → Task #23 (Sprint 5 P1)
+- Task #19 (#146 SCRAPER-20-PLAN.md 创建) → Task #24 (Sprint 4 改名记录)
+
+### 验证
+- `grep -c "Sprint 20+" 5 件文档` = 0 (全部改名)
+- `grep -c "Sprint 4" 5 件文档` > 0 (改名成功)
+- 跑批业务不阻塞, 跟主项目 9bd4274 脱节 (独立 repo 自己迭代)
+
+## [v0.4.14.42] - 2026-06-12 - docs: Sprint 4 文档补全 (README 跟新 + SCRAPER-20-PLAN + SCRAPER-20-RETROSPECTIVE)
 
 ### Added
 - **README.md** 跟新 (跟实际状态 100% 同步, 5 件 Sprint 16-19+ 变更摘要, 58/58 pytest, Sprint 19+ #141 治根记录)
-- **docs/SCRAPER-20-PLAN.md** 创建 (Sprint 20+ scraper 治理 backlog, 5 工单 #15-#19)
+- **docs/SCRAPER-20-PLAN.md** 创建 (Sprint 4 scraper 治理 backlog, 5 工单 #15-#19)
 - **docs/SCRAPER-20-RETROSPECTIVE.md** 创建 (Sprint 16.5+1 + 19+ 收口, 跟 Sprint 19 retrospective 9bd4274 同步)
 
 ### 后续
-- Sprint 20+ #15 (主项目软删 + symlink) + #16 (双层清理) + #17 (5 行修) + #18 (简历更新) 留 Sprint 20+
+- Sprint 4 #15 (主项目软删 + symlink) + #16 (双层清理) + #17 (5 行修) + #18 (简历更新) 留 Sprint 4
 
 ## [v0.4.14.41] - 2026-06-12 - fix(scraper): Sprint 19+ #141 治根 — check_dmp_session 业务层 session 验证
 

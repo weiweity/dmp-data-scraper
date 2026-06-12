@@ -22,7 +22,7 @@
 
 - 跨子项目依赖是隐性债 (Sprint 16.5+1 阶段 4 才暴露)
 - 5 文档隐式同步 (Sprint 16 Wave 1) 需正式记录 (v0.4.14.40 entry)
-- 跨子项目依赖用 lint 检测 (留 Sprint 20+ 治理)
+- 跨子项目依赖用 lint 检测 (留 Sprint 4 治理)
 
 ## Sprint 19+ #141 治根 (v0.4.14.41)
 
@@ -63,7 +63,7 @@
 - 跨子项目依赖: B1 治根 (v0.4.14.53, lark 通道 ETL 自治)
 - GitHub 推送: weiweity/dmp-data-scraper main = 06cc0f3
 
-## 留 Sprint 20+ 治理 (5 工单)
+## 留 Sprint 4 治理 (5 工单)
 
 - #15 主项目 scraper/ 软删 + symlink (P0)
 - #16 独立 repo 双层 scraper/ 清理 (P1)
