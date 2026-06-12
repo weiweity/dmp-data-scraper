@@ -51,17 +51,18 @@ Sprint 4 改名收口 (v0.4.14.43 5 件文档改名 + 5 工单 Task #15-#19 → 
   - 实际: 内层 `scraper/core/dmp_common.py` 有 Sprint 19+ #141 修复, 外层没有
   - **修订决策**: #25 完成后, 外层有完整能力, **删内层** (`/scraper/` 全删)
 - **步骤**:
-  1. 等 #25 完成 (外层 `core/dmp_common.py` 有修复)
-  2. 切 fix/sprint20-145-double-layer-cleanup 分支 from main (含 #25 fix)
-  3. git rm -rf scraper/  (内层)
-  4. 验证: `python3 -c "from core.dmp_common import check_dmp_session; ..."` 仍拿到修复
-  5. 跑 pytest core/tests/ 验证 58/58
-  6. 跑 dmp_master.py --items 验证 (data3.csv +0 行, 跑通即可)
-  7. 走 12 步流程 + CHANGELOG v0.4.14.46
-  8. push to GitHub
-- **风险**: 删除错误的层 (#25 完成后外层有修复, 风险低)
-- **依赖**: #25 必须先完成
-- **执行**: Sprint 5 第 3 工单
+  1. 等 #25 完成 (外层 `core/dmp_common.py` 有修复) ✅ (v0.4.14.45)
+  2. 切 fix/sprint5-146-double-layer-cleanup 分支 from main ca85a7f ✅
+  3. 改 8 个 .py 文件的 `from scraper.core.X` → `from core.X` ✅
+  4. `git rm -rf scraper/` (内层) ✅
+  5. 验证: `python3 -c "from core.dmp_common import check_dmp_session; ..."` 仍拿到修复 ✅
+  6. 跑 pytest core/tests/ 验证 58/58 ✅
+  7. 跑 `python3 core/dmp_master.py --help` 验证入口正常 ✅
+  8. 走 12 步流程 + CHANGELOG v0.4.14.46 ✅
+  9. push to GitHub (待用户 merge)
+- **风险**: 删除错误的层 (#25 完成后外层有修复, 风险低) → 0 风险, 两层 diff 验证空
+- **依赖**: #25 必须先完成 ✅
+- **执行**: Sprint 5 第 3 工单 ✅ completed (v0.4.14.46)
 
 ### P2 #22 5 行修 dmp_master.py:678 重建 + commit
 - **路径**: /Users/hutou/Desktop/fuqin date/fuqing-scraper

@@ -8,7 +8,7 @@
 """
 import pytest
 
-from scraper.core.validators.flow_validators import (
+from core.validators.flow_validators import (
     FLOW_FIELDS,
     check_business_smoothness,
     check_date_sanity,

@@ -2,6 +2,41 @@
 
 > **Sprint 16 Wave 1 (v0.4.14.39, 2026-06-11)**: 从 `fuqing-crm-analytics/scraper/` 拆出独立 git repo。 跟主项目 ETL / 前端 / Sprint 16.x backend 改动**完全隔离**。
 
+## [v0.4.14.46] - 2026-06-12 - chore(scraper): Sprint 5 #21 双层 scraper/ 清理 (删内层, 保留外层 /core/)
+
+### 背景
+Sprint 16 Wave 1 (v0.4.14.39) 拆出独立 repo 时, 留了**双层结构**: 外层 `/core/` (生产路径, 25 模块) + 内层 `/scraper/core/` (完整独立 repo 副本, 49 路径)。 Sprint 19+ #141 治根 (v0.4.14.41) 改的是内层, Sprint 5 #25 (v0.4.14.45) 把修复同步到外层后, 两层 dmp_common.py **完全一致** (md5 = 3a75473af55932fa3ccafdf9c2b70611, diff = 空)。 双层是历史包袱, 删内层, 唯一真相源 (single source of truth) = 外层 `/core/`。
+
+### Removed
+- `scraper/` 整目录 (内层, 49 路径, 含重复的 `core/dmp_*.py` + `core/utils/` + `core/validators/` + `core/config/` + `core/tests/` + `core/BUGFIX_*.md` + `core/MEMO_*.md` + `workflows/` + `.env.example` + `.gitignore` + `.learnings/` + `CLAUDE.md` + `CLEANUP_FINAL.md` + `KB-*.md` + `README.md` + `START.sh`)
+
+### Changed
+- `core/dmp_common.py:30-46` 4 个 import: `from scraper.core.X` → `from core.X` (utils.dates, utils.account, utils.t_offset, config.settings) + 注释段改写 (不再有"包路径"歧义)
+- `core/tests/test_dmp_common.py:9` 1 个 import
+- `core/tests/test_utils/test_t_offset.py:6` 1 个 import
+- `core/tests/test_utils/test_dates.py:10` 1 个 import
+- `core/tests/test_validators/test_flow_validators.py:11` 1 个 import
+- `core/tests/test_validators/test_items_validators.py:13` 1 个 import
+- `core/tests/test_validators/test_assets_validators.py:11` 1 个 import
+- `core/tests/test_config/test_settings.py:11,25,37,47,54` 5 处 (1 import + 4 patch path)
+- `core/tests/test_config/test_settings.py:62` 路径断言: `_SCRIPT_DIR.endswith('/scraper/core')` → `_SCRIPT_DIR.endswith('/core')` (外层路径结尾)
+
+### 验证
+- `md5 core/dmp_common.py scraper/core/dmp_common.py` (清理前): 两者完全一致 (3a75473af55932fa3ccafdf9c2b70611) ✅
+- `python3 -c "from core.dmp_common import check_dmp_session; ..."` (清理后): 拿到 Sprint 19+ #141 修复 (`/api_2/login/loginuserinfo` 在源码中) ✅
+- `python3 -c "import core.dmp_master; import core.dmp_common; ..."` 7 个核心模块全部加载成功 ✅
+- `PYTHONPATH=. pytest core/tests/ -v` → **58/58 passed** ✅ (2 个历史 fail 是双层 patch path 冲突, 修 import 时一并治根)
+- `python3 core/dmp_master.py --help` → 正常输出 ✅
+- `git status --short | wc -l` = 57 (49 D + 8 M) ✅
+
+### 任务来源
+- Sprint 5 #21 (P1, 依赖 #25 完成)
+- Sprint 4 改名收口 (v0.4.14.43) 期间发现
+
+### 后续
+- Sprint 5 #22 (5 行修 dmp_master.py:678) 等用户提供 5 行内容后启动
+- 业务码失效跑批真闭环 (Sprint 5 #25 修复 + #21 清理 = 生产路径唯一)
+
 ## [v0.4.14.45] - 2026-06-12 - fix(scraper): Sprint 5 #25 Sprint 19+ #141 修复同步到外层 (生产路径治根)
 
 ### 背景

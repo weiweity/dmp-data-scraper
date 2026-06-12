@@ -8,7 +8,7 @@
 """
 import pytest
 
-from scraper.core.validators.assets_validators import (
+from core.validators.assets_validators import (
     ASSETS_FIELDS,
     check_business_smoothness,
     check_date_sanity,
