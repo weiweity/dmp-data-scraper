@@ -1,7 +1,7 @@
 """
 core package — 芙清 DMP 数据采集核心模块
 
-Sprint 5 #21 (v0.4.14.46) 删内层 scraper/ 后, 项目统一从根 core/ 加载:
+Sprint 5 #21 (v0.1.7) 删内层 scraper/ 后, 项目统一从根 core/ 加载:
 - dmp_master.py 用 from dmp_common (top-level, 假设 core/ 在 sys.path)
 - dmp_common.py 用 from core.utils.dates (绝对 import, 假设 core/ 是 package)
 
