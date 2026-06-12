@@ -1,188 +1,95 @@
-# DMP 数据采集项目
+# fuqing-scraper (芙清 DMP 数据采集)
 
-> 芙清旗舰店达摩盘（DMP）数据自动采集工具
-> 最后更新：2026-06-08（Sprint: 7 件修复 + T_OFFSET 调度）
+> 达摩盘 SPA 自动抓数, Sprint 16 Wave 1 拆出独立 git repo
+> v0.4.14.41 (2026-06-12, Sprint 19+ #141 治根)
 
----
+## 跟主项目 fuqing-crm-analytics 解耦
 
-## 项目概述
+独立 git repo, 22 模块拆分, 跟主项目 ETL/前端/Sprint 16.x backend 改动完全隔离。
 
-从千牛后台自动抓取三类数据，用于运营决策：
+- **项目路径**: `/Users/hutou/Desktop/fuqin date/fuqing-scraper`
+- **GitHub**: `git@github.com:weiweity/dmp-data-scraper.git` (main = `06cc0f3`)
+- **父项目**: `fuqing-crm-analytics` (主项目 9bd4274, scraper/ 已软删)
+- **跨子项目依赖**: **B1 治根 v0.4.14.53** (lark 通道 ETL 自治)
+- **pytest**: **58/58 passed** (55 原有 + 3 Sprint 19+ #141 新增)
+- **跑批业务**: data3.csv 7164 → 7209 (+45 行, 0 行污染, 6/9-6/11 全部补完)
 
-| 数据类型 | 脚本 | 数据文件 | 目标日期 | 说明 |
-|----------|------|----------|----------|------|
-| 资产诊断 | `dmp_scraper.py` | `data2.csv` | T-1（昨天） | AIPL 7阶段人群资产总量 |
-| 流转数据 | `dmp_flow_scraper.py` | `data.csv` | T-2（前天） | 发现→至爱 7大人群流转漏斗 |
-| 单品洞察 | `dmp_item_insight_scraper.py` | `data3.csv` | 每日 | 14个核心商品的每日资产数据 |
+## 5 件 Sprint 16-19+ 变更摘要
 
-**技术栈**：Python 3 + Playwright（浏览器自动化，无头模式）
+1. **Sprint 16 Wave 1 (v0.4.14.39)**: 5 个 580+ 行单文件 → 22 模块 (core/ 拆分 utils/validators/config/tests/)
+2. **Sprint 16.5+1 (v0.4.14.40)**: 5 文档同步 (BUGFIX_2026-04-06 + 3 MEMO + launchd README)
+3. **Sprint 19+ #141 (v0.4.14.41)**: `check_dmp_session` 业务层 session 验证 — 加 `/api_2/login/loginuserinfo` API 调用
+4. **跨子项目 B1 治根 (v0.4.14.53)**: 主项目抽 `_send_lark_alert` 到 `scripts/etl/common/lark.py`, 3 ETL 脚本 import 改完
+5. **GitHub 推送 (2026-06-12)**: 远程 `weiweity/dmp-data-scraper` main = `06cc0f3`, 跟本地 100% 同步
 
----
+## Sprint 19+ #141 治根记录
 
-## ⚠️ 6/8 重要变更（Sprint 1 修复）
+**Root Cause (Playwright 监听器确诊)**:
+- chrome_profile cookie 业务层失效 (HTTP 200 但 `/api_2/login/loginuserinfo` 业务码失效)
+- SPA 检测后不跳顶级 page, 嵌 4 iframe (含千牛登录页)
+- 顶级 page 仍 dmp.taobao.com 主页布局, 永不触发 goods/view/overview/v2
 
-1. **SPM 更新**: `DMP_SPM` 从 `...OCRO8L` → `...lwdosJ` (达摩盘页面调整)
-2. **单品洞察 URL**: 加 `&analysisTab=compete` 参数
-3. **headless=True**: `dmp_master.py` 改为无头模式 (有头下 API 拦截失败)
-4. **Gate 1+Gate 2 删除**: 不再按数值变化率误跳过日期
-5. **T_OFFSET 环境变量**: 支持 `get_missing_dates_item` 动态 T+ 偏移
-6. **死代码清理 68 行**: `safe_write_csv` + `_is_completed` + YAML try/except
-7. **数据格式统一**: `data3.csv` 1186 行日期 `2026/06/01` → `2026/6/1`
+**check_dmp_session 假阳性 (dmp_common.py:444)**:
+- 只检测 "立即登录" 按钮 + page_title 含 "登录"
+- 不调 `/api_2/login/loginuserinfo` API 验证业务 session
 
-详细见 `CHANGELOG.md` v0.4.14.20 + `.learnings/ERRORS.md` 5 条新错误。
+**治根 (dmp_common.py:444-471)**:
+- 加 `/api_2/login/loginuserinfo` API 调用 (page.evaluate fetch)
+- 业务码失效 (body.data.isLogin=false) → 返 False (强制 login_qianniu 重登)
+- API 异常 → 返 False (graceful fallback)
 
----
+**测试 (3 新增, 55+3=58)**:
+- test_check_dmp_session_valid_business_layer
+- test_check_dmp_session_business_layer_invalid
+- test_check_dmp_session_api_timeout
 
-## 定时调度
+## 三大数据产品
 
-达摩盘数据 T+1 跨日 (6/7 数据 6/8 下午 15:00 才出), 必须分时跑批:
-
-| 时段 | T_OFFSET | 抓哪天 | 原因 |
+| 类型 | 脚本 | 数据文件 | 频率 |
 |---|---|---|---|
-| 早 9:00 | 2 | 今天-2 | 保险 (T+2 肯定已出) |
-| 下午 16:00 | 1 | 今天-1 | 15:00 数据刚更新 |
-
-启用方法见 `scraper/core/README-dmp-scraper-launchd.md`。
-
-| 数据类型 | 脚本 | 数据文件 | 目标日期 | 说明 |
-|----------|------|----------|----------|------|
-| 资产诊断 | `dmp_scraper.py` | `data2.csv` | T-1（昨天） | AIPL 7阶段人群资产总量 |
-| 流转数据 | `dmp_flow_scraper.py` | `data.csv` | T-2（前天） | 发现→至爱 7大人群流转漏斗 |
-| 单品洞察 | `dmp_item_insight_scraper.py` | `data3.csv` | 每日 | 14个核心商品的每日资产数据 |
-
-**技术栈**：Python 3 + Playwright（浏览器自动化）
-
----
+| 资产诊断 | dmp_scraper.py | data2.csv | T-1 |
+| 流转数据 | dmp_flow_scraper.py | data.csv | T-2 |
+| 单品洞察 | dmp_item_insight_scraper.py | data3.csv | 每日 |
 
 ## 快速开始
 
 ```bash
-# 进入核心目录
-cd scraper/core
-
-# 交互式菜单（推荐）
-./run.sh
-
-# 直接运行指定模块
-python3 dmp_master.py --assets      # 仅资产诊断
-python3 dmp_master.py --flow        # 仅流转数据
-python3 dmp_master.py --items       # 仅单品洞察
-python3 dmp_master.py               # 运行所有模块
+cd /Users/hutou/Desktop/fuqin\ date/fuqing-scraper
+pip install playwright pyyaml
+playwright install chromium
+PYTHONPATH=. pytest core/tests/ -v   # 58/58 passed
+cd core
+python3 dmp_master.py --items  # 单品洞察
+T_OFFSET=2 python3 dmp_master.py --items  # 早 9:00 (T-2)
+T_OFFSET=1 python3 dmp_master.py --items  # 下午 16:00 (T-1)
 ```
 
----
+## 验证
 
-## 目录结构
-
-```
-scraper/
-├── CLAUDE.md                          ← AI 操作手册
-├── README.md                          ← 你正在读的文件
-├── KB-数据采集-SPA接口拦截.md          ← 知识库
-├── .env.example                       ← 环境变量示例
-├── requirements.txt                   ← Python 依赖
-├── START.sh                           ← 快速启动脚本
-├── CLEANUP_FINAL.md                   ← 清理完成说明
-├── core/                              ← 核心脚本
-│   ├── dmp_master.py                 ← 统一入口
-│   ├── dmp_common.py                 ← 公共模块
-│   ├── dmp_scraper.py                ← 资产诊断抓取
-│   ├── dmp_flow_scraper.py           ← 流转数据抓取
-│   ├── dmp_item_insight_scraper.py   ← 单品洞察抓取
-│   ├── anti_detect.py                ← 反检测模块
-│   ├── sanity_check.py               ← 数据质量检查
-│   ├── run.sh                        ← 交互式菜单
-│   ├── account.txt                   ← 千牛账号密码（⚠️ 不要泄露）
-│   ├── data.csv                      ← 流转数据（⚠️ 只追加不覆盖）
-│   ├── data2.csv                     ← 资产诊断数据
-│   ├── data3.csv                     ← 单品洞察数据
-│   ├── config/                       ← 配置目录
-│   ├── BUGFIX_2026-04-06.md          ← Bug 修复报告
-│   ├── MEMO_2026-05-26.md            ← 改动记录
-│   ├── MEMO_2026-06-01.md            ← 改动记录
-│   └── MEMO_2026-06-02.md            ← 改动记录
-├── chrome_profile/                    ← 浏览器配置（⚠️ 不要删除！）
-├── .learnings/                        ← 经验日志
-└── workflows/                         ← 工作流
-    ├── dmp-daily-run.js              ← 每日数据采集
-    ├── dmp-data-sync.js              ← 数据同步
-    ├── dmp-data-fix.js               ← 数据修复
-    ├── dmp-data-verify.js            ← 数据验证
-    └── dmp-monitor.js                ← 监控告警
+```bash
+PYTHONPATH=. pytest core/tests/ -v   # 58/58 passed
+ruff check core/
+wc -l core/data3.csv               # ≥ 7000 行
 ```
 
----
+## 目录结构 (22 模块)
 
-## 文档索引
+```
+core/ - dmp_master.py + dmp_common.py + dmp_scraper.py + dmp_flow_scraper.py
+     + dmp_item_insight_scraper.py + anti_detect.py + sanity_check.py
+     + run.sh + config/ (3) + utils/ (4) + validators/ (3) + tests/ (8)
+```
 
-| 文档 | 路径 | 用途 |
-|------|------|------|
-| AI 操作手册 | `CLAUDE.md` | 项目约束、修改决策树、已知问题 |
-| 项目说明 | `README.md` | 项目概述和快速开始 |
-| SPA 拦截知识库 | `KB-数据采集-SPA接口拦截.md` | Network 拦截方法论 |
-| Bug 修复报告 | `core/BUGFIX_2026-04-06.md` | 新增人群数据为0的修复 |
-| 最新备忘 | `core/MEMO_2026-05-26.md` | 最近的修改记录 |
-| 经验日志 | `.learnings/LEARNINGS.md` | 技术发现和最佳实践 |
-| 错误日志 | `.learnings/ERRORS.md` | 已知错误和修复记录 |
-| 功能需求 | `.learnings/FEATURE_REQUESTS.md` | 待实现功能 |
-| 工作流指南 | `workflows/README.md` | 工作流使用说明 |
+## Sprint 20+ 5 工单 (留 backlog)
 
----
+- #15 主项目 scraper/ 软删 + symlink (P0)
+- #16 独立 repo 双层 scraper/ 清理 (P1)
+- #17 5 行修 dmp_master.py:678 重建 + commit (P2)
+- #18 简历文档 dmp-data-scraper.md 跟新 (P1)
+- #19 SCRAPER-20-PLAN.md 创建 (P0, 本次)
 
-## 关键约束
+详见 `docs/SCRAPER-20-PLAN.md` + `docs/SCRAPER-20-RETROSPECTIVE.md`。
 
-### 文件操作
+## GitHub
 
-- CSV 数据文件：**只追加不覆盖**
-- `chrome_profile/`：**绝对禁止删除**
-- `account.txt`：**不要泄露**
-
-### 代码修改
-
-- 修改 `dmp_common.py` 前确认所有 import 依赖
-- 修改 `Config.ITEM_IDS` 必须同步更新商品ID文档
-- 用中文标签定位元素，不要用随机 class 名
-
-### 增量逻辑
-
-所有模块都是增量模式：
-1. 读取现有 CSV → 2. 计算缺失日期 → 3. 只补缺失的数据
-
-**绝对不能**：
-- 重写整个 CSV 文件
-- 删除已有日期的数据行
-- 跳过缺失日期检测直接抓取
-
----
-
-## 验证项目
-
-**验证步骤**：
-1. 确保 `chrome_profile/` 存在且登录态有效
-2. 运行 `python3 dmp_master.py --assets` 验证资产诊断
-3. 运行 `python3 dmp_master.py --flow` 验证流转数据
-4. 运行 `python3 dmp_master.py --items` 验证单品洞察
-5. 检查 `data.csv`, `data2.csv`, `data3.csv` 是否正常生成
-
----
-
-## 常见问题
-
-### 登录失效？
-
-手动打开 Chrome 重新登录千牛 → cookie 自动保存到 chrome_profile/
-
-### 抓取失败？
-
-1. 检查 `chrome_profile/` 是否存在
-2. 检查登录态是否有效
-3. 检查 `.learnings/ERRORS.md` 中是否有已知问题
-
-### CSV 数据异常？
-
-1. 检查是否有多余的空行
-2. 检查日期格式是否一致
-
----
-
-*此文件由 AI 维护*
+https://github.com/weiweity/dmp-data-scraper

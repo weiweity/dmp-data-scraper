@@ -2,6 +2,16 @@
 
 > **Sprint 16 Wave 1 (v0.4.14.39, 2026-06-11)**: 从 `fuqing-crm-analytics/scraper/` 拆出独立 git repo。 跟主项目 ETL / 前端 / Sprint 16.x backend 改动**完全隔离**。
 
+## [v0.4.14.42] - 2026-06-12 - docs: Sprint 20+ 文档补全 (README 跟新 + SCRAPER-20-PLAN + SCRAPER-20-RETROSPECTIVE)
+
+### Added
+- **README.md** 跟新 (跟实际状态 100% 同步, 5 件 Sprint 16-19+ 变更摘要, 58/58 pytest, Sprint 19+ #141 治根记录)
+- **docs/SCRAPER-20-PLAN.md** 创建 (Sprint 20+ scraper 治理 backlog, 5 工单 #15-#19)
+- **docs/SCRAPER-20-RETROSPECTIVE.md** 创建 (Sprint 16.5+1 + 19+ 收口, 跟 Sprint 19 retrospective 9bd4274 同步)
+
+### 后续
+- Sprint 20+ #15 (主项目软删 + symlink) + #16 (双层清理) + #17 (5 行修) + #18 (简历更新) 留 Sprint 20+
+
 ## [v0.4.14.41] - 2026-06-12 - fix(scraper): Sprint 19+ #141 治根 — check_dmp_session 业务层 session 验证
 
 ### Background
