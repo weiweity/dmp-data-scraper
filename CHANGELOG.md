@@ -2,6 +2,33 @@
 
 > **Sprint 16 Wave 1 (v0.4.14.39, 2026-06-11)**: 从 `fuqing-crm-analytics/scraper/` 拆出独立 git repo。 跟主项目 ETL / 前端 / Sprint 16.x backend 改动**完全隔离**。
 
+## [v0.4.14.44] - 2026-06-12 - fix(docs): CLAUDE.md 5 处 Sprint 20+ 漏改 + 验证断言诚实标注
+
+### 背景
+v0.4.14.43 改名 Sprint 20+ → Sprint 4 收口时, 改了 4 件文档 (README / SCRAPER-4-PLAN / SCRAPER-4-RETROSPECTIVE / CHANGELOG) 但**漏改** CLAUDE.md 5 处 (line 21, 158, 159, 165, 173), 且 v0.4.14.43 entry 的验证断言 "`grep -c Sprint 20+ 5 件文档 = 0`" 是**假数据** (CHANGELOG 自身 5 处属历史记录不算, 但 CLAUDE.md 真有 5 处未改)。 用户拍板: 全部 5 处补改 + 验证段诚实标注。
+
+### Fixed
+- **CLAUDE.md:21** 顶部警告框: "Sprint 20+ 治理 backlog" → "Sprint 4 治理 backlog"
+- **CLAUDE.md:158-159** 决策树: "Sprint 20+ 工单?" → "Sprint 4 工单?" + "Task #15-#19 留 Sprint 20+ 治理" → "Task #20-#24 留 Sprint 4 治理" (Task 编号也跟 v0.4.14.43 改名同步)
+- **CLAUDE.md:165** 章节标题: "(Sprint 20+ backlog)" → "(Sprint 4 backlog)"
+- **CLAUDE.md:173** 表格 #19 行: "SCRAPER-20-PLAN.md" → "SCRAPER-4-PLAN.md" + "Sprint 20+ scraper 治理 backlog" → "Sprint 4 scraper 治理 backlog" + "pending" → "✅ completed (v0.4.14.42)" (跟 CHANGELOG 实际状态同步)
+- **CHANGELOG.md v0.4.14.43 验证段** 改"诚实记录"格式, 区分 4 件文档 (✅ 干净) vs CLAUDE.md (❌ 漏 5 处, 留 v0.4.14.44 补) vs CHANGELOG 自身 (5 处属历史记录)
+
+### 跨项目 Sprint 19+ 引用 (本就该保留, 25 处)
+- Sprint 19+ 是主项目 fuqing-crm-analytics 的 sprint 计数, "Sprint 19+ #141/#142/#143" 是跨项目工单标识符, 跟 scraper 自己 Sprint 4 命名空间**不冲突**, 删了反而丢历史溯源。
+- 保留位置: CHANGELOG (5) / README (4) / CLAUDE.md (7) / SCRAPER-4-PLAN (4) / SCRAPER-4-RETROSPECTIVE (3) / scraper/core/dmp_common.py:452 (1) / core/tests/test_dmp_common.py:1 (1) = **25 处**
+
+### 验证
+- `grep -c "Sprint 20+" CLAUDE.md` = 0 ✅
+- `grep -c "Sprint 4" CLAUDE.md` = 5 ✅ (新)
+- `grep -c "Sprint 19+" CLAUDE.md` = 7 (保留, 跨项目)
+- `pytest core/tests/ -v`: 58/58 passed ✅ (无 .py 改动, 0 影响)
+- `ruff check core/`: 0 issue ✅ (无 .py 改动, 0 影响)
+
+### 后续
+- Sprint 5 #20-#24 (主项目软删 / 双层清理 / 5 行修 / 简历跟新 / Sprint 4 改名记录) 留 Sprint 5 执行
+- Sprint 5 启动前必读 #25 (Sprint 19+ #141 修复实际未生效, 修复同步到外层 core/dmp_common.py) — 已识别未在 backlog, 需补工单
+
 ## [v0.4.14.43] - 2026-06-12 - chore: Sprint 4 改名 + Sprint 5 5 工单 Task #20-#24 编号
 
 ### 背景
@@ -21,10 +48,11 @@ Sprint 20+ 命名跟主项目 fuqing-crm-analytics Sprint 20+ 重复造成迷惑
 - Task #18 (#147 简历跟新) → Task #23 (Sprint 5 P1)
 - Task #19 (#146 SCRAPER-20-PLAN.md 创建) → Task #24 (Sprint 4 改名记录)
 
-### 验证
-- `grep -c "Sprint 20+" 5 件文档` = 0 (全部改名)
-- `grep -c "Sprint 4" 5 件文档` > 0 (改名成功)
-- 跑批业务不阻塞, 跟主项目 9bd4274 脱节 (独立 repo 自己迭代)
+### 验证 (诚实记录)
+- ✅ `grep -c "Sprint 20+" 4 件文档 (README + SCRAPER-4-PLAN + SCRAPER-4-RETROSPECTIVE + CHANGELOG 历史段)` = 0
+- ❌ `grep -c "Sprint 20+" CLAUDE.md` = 5 (L21/L158/L159/L165/L173 漏改, 留 v0.4.14.44 补)
+- ✅ `grep -c "Sprint 4" 5 件文档` > 0 (主改名成功)
+- ✅ 跑批业务不阻塞, 跟主项目 9bd4274 脱节 (独立 repo 自己迭代)
 
 ## [v0.4.14.42] - 2026-06-12 - docs: Sprint 4 文档补全 (README 跟新 + SCRAPER-20-PLAN + SCRAPER-20-RETROSPECTIVE)
 
