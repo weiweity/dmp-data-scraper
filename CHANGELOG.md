@@ -2,6 +2,31 @@
 
 > **Sprint 16 Wave 1 (v0.4.14.39, 2026-06-11)**: 从 `fuqing-crm-analytics/scraper/` 拆出独立 git repo。 跟主项目 ETL / 前端 / Sprint 16.x backend 改动**完全隔离**。
 
+## [v0.4.14.45] - 2026-06-12 - fix(scraper): Sprint 5 #25 Sprint 19+ #141 修复同步到外层 (生产路径治根)
+
+### 背景
+v0.4.14.41 (Sprint 19+ #141 治根) commit `da6240b` 改的是 `scraper/core/dmp_common.py` (内层), 但生产 `core/dmp_master.py:30` `from dmp_common import ...check_dmp_session` 解析到**外层** `core/dmp_common.py` (30413 字节, **无修复**)。 业务码失效时 scraper **仍不**会走 login_qianniu 重登, 跑批 0/15 失败根因未真闭环。 58/58 pytest 通过是假象 (测试从 `scraper.core.dmp_common` 导入, 测的是内层, 跟生产路径不同)。
+
+### Fixed
+- **core/dmp_common.py:444** 加 `/api_2/login/loginuserinfo` API 调用 (22 行, 跟内层 `scraper/core/dmp_common.py:451-472` 完全一致)
+  - 业务码失效 (body.data.isLogin=false) → 返 False (强制 login_qianniu 重登)
+  - API 异常 → 返 False (graceful fallback)
+- `diff core/dmp_common.py scraper/core/dmp_common.py` → 空 (两层完全一致)
+
+### 验证
+- `python3 -c "from core.dmp_common import check_dmp_session; ..."` → 拿到修复 ✅ (生产路径有效)
+- `python3 -c "from core.dmp_common import check_dmp_session; ..."` 验证 `/api_2/login/loginuserinfo` 在源码中 ✅
+- `pytest core/tests/ -q` → 58/58 passed ✅ (内层测试间接覆盖外层, 因两层函数体完全一致)
+- `git diff core/dmp_common.py` → +22 行净增 (跟内层同步)
+
+### 任务来源
+- Sprint 5 启动前 analysis 识别
+- Sprint 4 改名收口 (v0.4.14.44) 期间发现
+
+### 后续
+- Sprint 5 #21 (双层清理) 等本工单合 main 后启动
+- 业务码失效跑批真闭环
+
 ## [v0.4.14.44] - 2026-06-12 - fix(docs): CLAUDE.md 5 处 Sprint 20+ 漏改 + 验证断言诚实标注
 
 ### 背景

@@ -448,7 +448,28 @@ def check_dmp_session(page):
         log("[会话检测] 检查达摩盘登录状态...")
         page.goto("https://dmp.taobao.com/", wait_until="domcontentloaded", timeout=15000)
         page.wait_for_timeout(2000)
-        
+
+        # Sprint 19+ #141 治根: 业务层 session 验证
+        # 6/11 跑批 0/15 根因: chrome_profile cookie HTTP 200 但业务码失效
+        # SPA 检测后不跳顶级 page, 嵌 4 iframe (含千牛登录页), DOM 假阳性
+        # 改用 API 验证业务 session: isLogin=false → 强制重登
+        try:
+            api_resp = page.evaluate("""async () => {
+                const r = await fetch('/api_2/login/loginuserinfo?bizCode=dmp', {
+                    credentials: 'include',
+                    headers: { 'Accept': 'application/json' }
+                });
+                const body = await r.json();
+                return { status: r.status, body };
+            }""")
+            is_login = (api_resp or {}).get('body', {}).get('data', {}).get('isLogin', False)
+            if not is_login:
+                log("[会话检测] 业务层 session 失效 (/api_2/login/loginuserinfo isLogin=false), 需要重新登录")
+                return False
+        except Exception as e:
+            log(f"[会话检测] loginuserinfo API 调用异常: {e}, 视为需要重新登录")
+            return False
+
         # 检测页面是否有"立即登录"按钮（未登录标志）
         login_btns = page.query_selector_all("button:has-text('立即登录')")
         if len(login_btns) > 0:
