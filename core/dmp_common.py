@@ -27,8 +27,7 @@ import os
 import time
 from datetime import datetime, timedelta
 
-# === Re-exports from utils/ and config/ (Sprint 16 Wave 1 拆分 + Sprint 5 #21 双层清理) ===
-# Sprint 5 #21 (v0.4.14.46) 删了内层 scraper/ 后, import 从 `scraper.core.X` 改成 `core.X`。
+# === Re-exports from utils/ and config/ ===
 # 关键: 用绝对 import `core.X` (而不是 `.X` 相对), 因为 dmp_common.py
 # 同时被两种 import 模式加载:
 #   1. from dmp_common import Config (top-level, 走 sys.path)
