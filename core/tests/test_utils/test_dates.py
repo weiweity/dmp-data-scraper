@@ -7,7 +7,7 @@ from datetime import date, datetime
 
 import pytest
 
-from scraper.core.utils.dates import format_date_for_csv, parse_date
+from core.utils.dates import format_date_for_csv, parse_date
 
 
 def test_parse_date_slash_format_returns_datetime() -> None:

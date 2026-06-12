@@ -20,10 +20,14 @@ import time
 import random
 from datetime import datetime
 
-# 确保 core/ 目录在搜索路径中（处理从不同目录运行脚本的情况）
+# 确保 core/ 目录 + 父目录 都在搜索路径中（处理从不同目录运行脚本的情况）
+# - core/ 让 `from dmp_common import ...` 走 top-level 模式
+# - 父目录让 `from core.X import ...` 走绝对 import 模式 (dmp_common.py 内部)
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-if _SCRIPT_DIR not in sys.path:
-    sys.path.insert(0, _SCRIPT_DIR)
+_PARENT_DIR = os.path.dirname(_SCRIPT_DIR)
+for _p in (_SCRIPT_DIR, _PARENT_DIR):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
 
 # 导入公共模块（必须在 sys.path.insert 之后，详见上方 _SCRIPT_DIR 块）
 from dmp_common import (  # noqa: E402

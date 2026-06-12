@@ -10,7 +10,7 @@
 """
 import pytest
 
-from scraper.core.validators.items_validators import (
+from core.validators.items_validators import (
     _check_api_health,
     _check_business_smoothness,
     _detect_copy_day,

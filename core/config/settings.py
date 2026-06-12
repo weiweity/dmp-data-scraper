@@ -1,33 +1,29 @@
 """
-scraper/core/config/settings.py
+core/config/settings.py
 
-Config single source of truth — Sprint 16 Wave 1 (v2 design, 2026-06-11).
+Config single source of truth.
 Extracted from dmp_common.py. yaml items loaded on demand via Config.load_items().
 
-v2 design: Config.ITEM_IDS DELETED 2026-06-11, use Config.load_items() instead.
-
-零功能变更承诺: 所有属性跟原 dmp_common.py:46-81 行为完全一致。
+属性:
 - USER_DATA_DIR / ACCOUNT_FILE / *_DATA_FILE / DEBUG_DIR 都是绝对路径
-  (用 os.path.join + Path(__file__).resolve().parent.parent 拿到 scraper/core/ 路径)
+  (用 os.path.dirname + os.path.abspath 拿到 core/ 路径)
 - DMP_SPM 完整 5 段: a2e3k.28338430.c0d46757f.de019e68a.1d1125eblwdosJ
 - 保留 DMP_ROUTE_ASSETS / DMP_ROUTE_FLOW / DMP_ROUTE_ITEM 3 个常量
 """
-from pathlib import Path
 import os
 import yaml
 
-# scraper/core/ 绝对路径 (跟原 dmp_common.py:_SCRIPT_DIR 等价)
-SCRAPER_CORE_DIR = Path(__file__).resolve().parent.parent
-# items.yaml 在项目根 config/ (fuqing-crm-analytics/config/items.yaml)
-# SCRAPER_CORE_DIR = .../scraper/core/, parent = .../scraper/, parent.parent = .../fuqing-crm-analytics/
-CONFIG_ITEMS_YAML = SCRAPER_CORE_DIR.parent.parent / 'config' / 'items.yaml'
+# core/ 绝对路径 (跟文件其他 os.path 风格统一)
+CORE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# items.yaml 在 core/config/items.yaml (跟 core/ 同级 config 子目录)
+CONFIG_ITEMS_YAML = os.path.join(CORE_DIR, 'config', 'items.yaml')
 
 
 class Config:
     """集中管理所有路径和配置参数 (跟原 dmp_common.py:46-81 完全等价)"""
 
     # 脚本所在目录（供外部引用, 跟原 dmp_common.Config._SCRIPT_DIR 一致)
-    _SCRIPT_DIR = str(SCRAPER_CORE_DIR)
+    _SCRIPT_DIR = CORE_DIR
 
     # === 数据文件路径 (绝对路径, 跟原 dmp_common.Config 一致) ===
     ASSETS_DATA_FILE = os.path.join(_SCRIPT_DIR, "data2.csv")
@@ -68,9 +64,9 @@ class Config:
         v2 设计: 删除 Config.ITEM_IDS 后, 新代码应该用 Config.load_items() 拿到 list[str]。
         旧 Config.ITEM_IDS 仍保留 (向后兼容 Wave 1 caller 文件), Wave 2 真改 import 路径后再删。
         """
-        if not CONFIG_ITEMS_YAML.exists():
+        if not os.path.exists(CONFIG_ITEMS_YAML):
             raise FileNotFoundError(f'items.yaml not found at {CONFIG_ITEMS_YAML}')
-        data = yaml.safe_load(CONFIG_ITEMS_YAML.read_text(encoding='utf-8'))
+        data = yaml.safe_load(open(CONFIG_ITEMS_YAML, encoding='utf-8'))
         if not isinstance(data, dict) or 'items' not in data:
             raise ValueError(
                 f'items.yaml schema invalid: expected dict with "items" key, got {type(data)}'

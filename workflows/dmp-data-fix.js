@@ -15,8 +15,8 @@ phase('数据备份')
 const backup = await agent(`
   备份 data3.csv：
 
-  1. 复制 /Users/hutou/Desktop/work plat/DMP_test_package/core/data3.csv
-  2. 备份到 /Users/hutou/Desktop/work plat/DMP_test_package/core/data3_pre_fix_backup_20260601.csv
+  1. 复制 /Users/hutou/Desktop/fuqin-date/fuqing-scraper/core/data3.csv
+  2. 备份到 /Users/hutou/Desktop/fuqin-date/fuqing-scraper/core/data3_pre_fix_backup_20260601.csv
   3. 验证备份文件存在且行数与原文件一致
   4. 输出备份文件的 MD5 校验和
 
@@ -59,7 +59,7 @@ const snapshot = await agent(`
   3. 保留 5/1~5/20 的所有数据不动
   4. 保留 5/24~5/26 中正常的行（如 621639424901、621639424901）
 
-  项目路径：/Users/hutou/Desktop/work plat/DMP_test_package/core/
+  项目路径：/Users/hutou/Desktop/fuqin-date/fuqing-scraper/core/
 `, { label: '识别要删除的行', phase: '数据快照' })
 
 phase('执行删除')
@@ -98,7 +98,7 @@ phase('缓存清理')
 const cleanup = await agent(`
   清理 completed_items.json：
 
-  1. 读取 /Users/hutou/Desktop/work plat/DMP_test_package/core/completed_items.json
+  1. 读取 /Users/hutou/Desktop/fuqin-date/fuqing-scraper/core/completed_items.json
   2. 找出所有日期 >= 2026-05-24 的条目
   3. 删除这些条目
   4. 写回文件

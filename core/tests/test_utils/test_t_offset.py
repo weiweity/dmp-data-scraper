@@ -3,7 +3,7 @@ from datetime import date, timedelta
 
 import pytest
 
-from scraper.core.utils.t_offset import get_target_date
+from core.utils.t_offset import get_target_date
 
 
 def test_get_target_date_default_is_yesterday(monkeypatch) -> None:

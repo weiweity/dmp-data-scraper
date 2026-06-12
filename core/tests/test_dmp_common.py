@@ -6,7 +6,7 @@
 """
 from unittest.mock import MagicMock
 
-from scraper.core.dmp_common import check_dmp_session
+from core.dmp_common import check_dmp_session
 
 
 def _mock_page(is_login=None, api_exc=None):

@@ -27,22 +27,22 @@ import os
 import time
 from datetime import datetime, timedelta
 
-# === Re-exports from utils/ and config/ (Sprint 16 Wave 1 拆分) ===
-# 关键: 用绝对 import `scraper.core.X` (而不是 `.X` 相对), 因为 dmp_common.py
+# === Re-exports from utils/ and config/ ===
+# 关键: 用绝对 import `core.X` (而不是 `.X` 相对), 因为 dmp_common.py
 # 同时被两种 import 模式加载:
 #   1. from dmp_common import Config (top-level, 走 sys.path)
-#   2. import scraper.core.dmp_common (包路径)
+#   2. import core.dmp_common (包路径)
 # 相对 import `.utils.dates` 在模式 1 下会失败 ("attempted relative import
 # with no known parent package")。绝对 import 在两种模式下都工作。
-from scraper.core.utils.dates import (
+from core.utils.dates import (
     parse_date,
     format_date_for_csv,
     normalize_date_str,
     parse_number,
 )
-from scraper.core.utils.account import read_account
-from scraper.core.utils.t_offset import get_target_date
-from scraper.core.config.settings import Config
+from core.utils.account import read_account
+from core.utils.t_offset import get_target_date
+from core.config.settings import Config
 
 
 # ============ 脚本目录常量 ============
