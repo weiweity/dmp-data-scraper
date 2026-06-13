@@ -4,6 +4,43 @@
 
 ---
 
+## [v0.1.10] - 2026-06-13 - fix(scraper): CSV 日期格式 YYYY/M/D → YYYY/MM/DD (字符串排序 = 时序排序)
+
+### 背景
+用户指出 data3.csv 应该是 5/31 为止, 但脚本识别为 5/9. 根因查清: `format_date_for_csv` 主动去前导零产生 `YYYY/M/D` 格式, 字符串字典序 ≠ 时序 (例: '2026/5/9' > '2026/5/10'). 注释还说"必须去掉以保持一致", 实际 3 个测试在固化这个错误行为. 用户明确要求"不要打补丁, 不要偷懒, 就单纯从源头解决".
+
+### Fixed
+- **core/utils/dates.py:27-42 `format_date_for_csv`**: 改用 `dt.strftime('%Y/%m/%d')` 保留前导零 (YYYY/MM/DD)
+- **core/dmp_item_insight_scraper.py:241 内部 `format_date_for_csv`**: 同步改 `dt.strftime('%Y/%m/%d')` (旧版 f-string 也无前导零)
+
+### Changed
+- **core/data3.csv** (7043 行): 时间列迁移 YYYY/M/D → YYYY/MM/DD (5872 行 normalize, 1171 行已是新格式)
+  - 备份: `data3.csv.pre-format-fix-2026-06-13` (本地保留, 不进 git)
+- **core/tests/test_utils/test_dates.py** (3 测试反转 + 3 新测试):
+  - `test_format_date_for_csv_strips_leading_zero` → `_keeps_leading_zero`
+  - `test_format_date_for_csv_does_not_zero_pad` → `_zero_pads`
+  - `test_format_date_for_csv_accepts_datetime`: 期望值 `2026/5/21` → `2026/05/21`
+  - 新增 `test_lexical_sort_equals_chronological_sort` (回归测试, 防回退)
+  - 新增 `test_parse_date_accepts_both_formats` (兼容旧数据)
+  - 新增 `test_normalize_date_str_pads_to_yyyy_mm_dd` (round-trip 归一化)
+
+### Verified
+- `python3 normalize + sort verify` → 字符串排序 == 时序排序 ✅ (5/31 正确为最新)
+- `pytest core/tests/test_utils/test_dates.py` → 13/13 passed
+- `pytest core/tests/` → 94/94 passed (无回归)
+
+### Lesson (沉淀到 .learnings/ERRORS.md ERR-20260613-003)
+1. **测试不能固化错误行为**: 3 个测试主动断言"必须去前导零", 锁死 bug. 写测试前要问"为什么这么断言?"
+2. **简洁不总是对**: 主动去前导零看似简洁, 牺牲了字符串可排序性. ISO 8601 才是字符串可排序的格式.
+3. **注释可能误导**: 旧代码注释"必须去掉以保持一致, 否则 get_missing_dates_* 函数无法正确比对" 是错的 — 实际用 parse_date 转 date 对象, 不做字符串比对.
+4. **从源头改 ≠ 改测试**: 改 format_date_for_csv (源头) + 改测试 (去掉错误断言) + 迁移数据 (兜底旧数据) = 三层全做.
+
+### 风险与回滚
+- 风险: 旧格式 YYYY/M/D 残留 (如果有第三方读取 CSV 的代码) → parse_date 同时支持两种格式, 兼容性 OK
+- 回滚: `cp core/data3.csv.pre-format-fix-2026-06-13 core/data3.csv` + `git revert`
+
+---
+
 ## [v0.1.9] - 2026-06-13 - fix(scraper): DMP 单品洞察 datepicker selector 修复 + T-1 早退 + L2/L3 防御加固
 
 ### 背景

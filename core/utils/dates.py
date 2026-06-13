@@ -25,21 +25,27 @@ def parse_date(date_str):
 
 
 def format_date_for_csv(dt):
-    """将datetime或date格式化为CSV用的日期字符串 (2026/4/1)
+    """将datetime或date格式化为CSV用的日期字符串 (2026/05/21)
 
-    注意：CSV中存储的是不带前导零的格式，如 2026/5/21
-    而 strftime('%Y/%m/%d') 生成带前导零的格式如 2026/05/21
-    必须去掉前导零以保持一致，否则 get_missing_dates_* 函数无法正确比对
+    2026-06-13 改造（ERR-20260613-003）：保留前导零 (YYYY/MM/DD)
+    - 旧版去前导零 (YYYY/M/D) 看似"更简洁"，但导致字符串字典序 ≠ 时序
+      例: '2026/5/9' > '2026/5/10' > '2026/5/19' > '2026/5/2' 字符串排序
+      实际时序应是 5/2 < 5/9 < 5/10 < 5/19
+    - 修复后字符串排序 = 时序，可直接 sorted()，不再依赖 parse_date round-trip
+    - parse_date 同时支持 YYYY/M/D 和 YYYY/MM/DD 两种输入（strptime 宽松）
+
+    Args:
+        dt: datetime 或 date 对象
+
+    Returns:
+        str: 'YYYY/MM/DD' 格式
     """
     if isinstance(dt, datetime):
-        s = dt.strftime('%Y/%m/%d')
-    elif isinstance(dt, __import__('datetime').date):
-        s = dt.strftime('%Y/%m/%d')
-    else:
-        return str(dt)
-    # 去掉前导零：2026/05/21 -> 2026/5/21
-    parts = s.split('/')
-    return f"{parts[0]}/{int(parts[1])}/{int(parts[2])}"
+        return dt.strftime('%Y/%m/%d')
+    from datetime import date as _date
+    if isinstance(dt, _date):
+        return dt.strftime('%Y/%m/%d')
+    return str(dt)
 
 
 def parse_date_for_sort(date_str):

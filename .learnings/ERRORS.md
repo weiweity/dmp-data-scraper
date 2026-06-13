@@ -238,6 +238,64 @@ DMP 单品洞察页 datepicker 找不到, 跑批 0/60 全失败. 错误日志:
 
 ---
 
+## [ERR-20260613-003] CSV 日期格式 YYYY/M/D 无前导零 → 字符串排序错乱
+
+**Logged**: 2026-06-13T23:00:00Z
+**Priority**: high
+**Status**: resolved
+**Area**: data-format / sortability
+
+### Summary
+`format_date_for_csv` 主动去掉前导零 (YYYY/M/D), 看似简洁, 实际导致字符串字典序 ≠ 时序. 用户指出 data3.csv "应该是 5/31 为止, 你识别到 5/9" 后, 根因查清: 字符串排序 '2026/5/9' > '2026/5/10' > '2026/5/19' > '2026/5/2' 完全错乱.
+
+### Root Cause
+1. **生产代码**: `core/utils/dates.py:27-42` `format_date_for_csv` 主动去掉前导零, 注释还说"必须去掉以保持一致, 否则 get_missing_dates_* 函数无法正确比对" (注释错误, get_missing_dates_item 用 parse_date 转 date 对象, 不做字符串比对)
+2. **副本**: `core/dmp_item_insight_scraper.py:241` 第二个 `format_date_for_csv` 用 f-string `f"{dt.year}/{dt.month}/{dt.day}"` 也产生无前导零格式
+3. **测试固化错误**: `core/tests/test_utils/test_dates.py:44-53` 3 个测试 (`test_format_date_for_csv_strips_leading_zero` / `_does_not_zero_pad`) 主动断言错误行为, 锁死了 bug
+
+### Symptom
+```python
+dates = ["2026/5/1", "2026/5/9", "2026/5/10", "2026/5/19", "2026/5/2", "2026/5/20", "2026/5/31"]
+sorted(dates)  # ['2026/5/1', '2026/5/10', '2026/5/11', ...'2026/5/19', '2026/5/2', '2026/5/20', ...'2026/5/31', '2026/5/9']
+# ❌ 5/9 在最末, 5/2 在 5/19 后
+```
+
+### Fix
+**从源头改** (用户明确要求"不要打补丁, 不要偷懒"):
+1. `core/utils/dates.py:27-42` `format_date_for_csv` 改用 `dt.strftime('%Y/%m/%d')` (保留前导零)
+2. `core/dmp_item_insight_scraper.py:241` 内部 `format_date_for_csv` 同步改 `dt.strftime('%Y/%m/%d')`
+3. **CSV 数据迁移**: 读 7043 行, 经 `normalize_date_str` (parse → format round-trip) 重新格式化
+   - 5872 行从 YYYY/M/D 改为 YYYY/MM/DD
+   - 1171 行已是 YYYY/MM/DD (无需改动)
+4. **测试反转** `test_dates.py`:
+   - `test_format_date_for_csv_strips_leading_zero` → `_keeps_leading_zero`
+   - `test_format_date_for_csv_does_not_zero_pad` → `_zero_pads`
+   - `test_format_date_for_csv_accepts_datetime`: 期望值 `2026/5/21` → `2026/05/21`
+5. **新增 3 个测试**:
+   - `test_lexical_sort_equals_chronological_sort` (回归测试, 防回退)
+   - `test_parse_date_accepts_both_formats` (兼容旧数据)
+   - `test_normalize_date_str_pads_to_yyyy_mm_dd` (round-trip 归一化)
+6. 备份原 CSV: `data3.csv.pre-format-fix-2026-06-13`
+
+### Verified
+- `python3 normalize + sort verify` → 字符串排序 == 时序排序 ✅
+- `pytest core/tests/test_utils/test_dates.py` → 13/13 passed
+- `pytest core/tests/` → 94/94 passed (无回归)
+- 备份文件 `data3.csv.pre-format-fix-2026-06-13` 留作回滚兜底
+
+### Lesson
+1. **测试不能固化错误行为**: 3 个测试主动断言"必须去前导零", 把 bug 锁死在产品里. 教训: 写测试前要问"为什么这么断言?", 跟原始需求对照, 不要照搬实现.
+2. **简洁不总是对**: 主动"去前导零"看起来简洁, 但牺牲了字符串排序的正确性. ISO 8601 (YYYY-MM-DD) 才是字符串可排序的格式.
+3. **注释可能误导**: 旧代码注释"必须去掉前导零以保持一致, 否则 get_missing_dates_* 函数无法正确比对" 是错的 — 实际 get_missing_dates_item 用 parse_date 转 date 对象, 不做字符串比对. 教训: 注释要可验证, 不可只信.
+4. **从源头改 ≠ 改测试**: 用户明确说"不要打补丁, 从源头". 我改了 format_date_for_csv (源头) + 改测试 (去掉错误断言) + 迁移数据 (兜底旧数据) = 三层全做, 不是只改测试绕过问题.
+
+### Metadata
+- Related Files: core/utils/dates.py, core/dmp_item_insight_scraper.py, core/tests/test_utils/test_dates.py, core/data3.csv (migrated)
+- Tests: 13 in test_dates.py (was 10, +3 new for regression)
+- Backup: data3.csv.pre-format-fix-2026-06-13
+
+---
+
 ## [ERR-20260403-002] 资产诊断数据全同值（弹窗干扰+距离算法）
 
 **Logged**: 2026-04-03T18:30:00Z
