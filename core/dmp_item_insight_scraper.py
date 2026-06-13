@@ -1045,19 +1045,21 @@ def _find_date_trigger_multi(page, timeout=5000):
         return False
 
     strategies = [
-        # 策略0a (2026-06-13 新增最高优先): 过滤后的"昨日" trigger
+        # 策略0a (2026-06-13 新增最高优先): 用户真实验证路径
+        # #trigger_mx_44226 > div > span.mx-trigger-label
+        # 这是浏览器 DevTools 实测路径, ID 前缀稳定, 不依赖 .nth() 索引
         {
-            'name': 'yesterday-filtered-first',
-            'locator': page.locator("span.mx-trigger-label").first,
-            'filter': _is_real_date_trigger,
+            'name': 'id-prefix-direct-path',
+            'locator': page.locator("[id^='trigger_mx_'] > div > span.mx-trigger-label").first,
+            'filter': lambda el: el.is_visible(),
         },
-        # 策略0b: 试 nth(1) 跳过"同行同层"
+        # 策略0b: 备选 1 (nth(1) 跳过顶部"同行同层")
         {
             'name': 'yesterday-filtered-nth1',
             'locator': page.locator("span.mx-trigger-label").nth(1),
             'filter': _is_real_date_trigger,
         },
-        # 策略0c: 试 nth(3) 中间位置
+        # 策略0c: 备选 2 (nth(3) 中间位置)
         {
             'name': 'yesterday-filtered-nth3',
             'locator': page.locator("span.mx-trigger-label").nth(3),

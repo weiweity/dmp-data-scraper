@@ -4,6 +4,27 @@
 
 ---
 
+## [v0.1.13] - 2026-06-14 - fix(scraper): datepicker trigger 用用户精确路径 [id^=trigger_mx_] > div > span.mx-trigger-label
+
+### 背景
+v0.1.12 用 nth(0/1/3) + EXCLUDE_TEXTS 过滤找 trigger, 跑批发现仍失败: 6/1 第一个商品 API 抓到 1,720,065 (用户之前标记的污染值, 其实是 6/2 真实数据), Date Sanity Check 正确拒绝 0/45. 用户给出浏览器 DevTools 实测精确路径: `#trigger_mx_44226 > div > span.mx-trigger-label`. 这是上游 trigger 容器, ID 前缀稳定 (counter 变, 前缀不变).
+
+### Fixed
+- **core/dmp_item_insight_scraper.py:1020 `_find_date_trigger_multi` 策略 0a 改为精确路径**:
+  - 旧: `.first` + 文本过滤 (依赖 nth 索引 + 文本判断)
+  - 新: `[id^='trigger_mx_'] > div > span.mx-trigger-label` (直接命中, 跨刷新稳定)
+
+### 验证 (真实跑批 6/1-6/3)
+- 6/1 全 15 个商品**写入成功** (CSV 7043→7059)
+- 0 拒绝写入, 0 UI 失败
+- Date Sanity Check 全部 `matched` (target == 实际, 不是污染)
+- 用户实测数据样例: 587051744204 6/2 资产总量 1,720,065 (这是真 6/2 数据, 不是 6/1 污染!)
+
+### Lesson
+**不要假设 nth() 索引是稳定的** (页面上有 5+ 个同类 trigger, 顺序由 DMP 渲染顺序决定). 永远优先用**用户浏览器 DevTools 实测的精确路径**——这是唯一稳定的源头. 我之前用 nth(0) 抓到"同行同层"过滤, 反复猜 nth(1)/nth(3), 浪费了 1 小时跑批. 用户一句话:"document.querySelector('#trigger_mx_44226 > div > span.mx-trigger-label')" 就解决.
+
+---
+
 ## [v0.1.12] - 2026-06-13 - fix(scraper): datepicker trigger 选错修正 (排除过滤下拉)
 
 ### 背景
