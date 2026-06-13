@@ -1132,27 +1132,48 @@ def select_date_smart_v2(page, target_date, fallback_date):
             time.sleep(1)
 
         # === 关闭可能的弹窗/对话框（避免遮挡日期选择器）===
+        # 2026-06-13 增强：加 [id*="mask_dlg"] 匹配（DMP 新弹窗 mask_dlg_1351 之前逃过）
+        # + 通用高 z-index 弹窗隐藏（DMP 后续再改 ID/类名也能兜底）
         try:
             page.evaluate("""() => {
-                // 关闭达摩盘新功能提示弹窗（wrapper_dlg_632 等）
+                // 1. 关闭达摩盘新功能提示弹窗（wrapper_dlg_632 等）
                 const dialogs = document.querySelectorAll('[id^="wrapper_dlg_"][data-daynamic-view*="dialog"]');
                 dialogs.forEach(d => {
-                    // 尝试找关闭按钮
                     const closeBtn = d.querySelector('.close-btn, [class*="close"], .mx-dialog-close');
                     if (closeBtn) closeBtn.click();
                 });
-                
-                // 强制隐藏所有遮罩层对话框
+
+                // 2. 强制隐藏所有遮罩层（class 含 mask/overlay）
                 const overlays = document.querySelectorAll('[class*="mask"], [class*="overlay"]');
                 overlays.forEach(o => {
                     if (o.style) o.style.display = 'none';
                 });
-                
-                // 直接隐藏已知遮挡元素
+
+                // 3. 直接隐藏已知遮挡元素 (wrapper_dlg_*)
                 const blockingDivs = document.querySelectorAll('div[id^="wrapper_dlg_"]');
                 blockingDivs.forEach(d => { if (d.style) d.style.display = 'none'; });
+
+                // 4. 2026-06-13 新增: 隐藏 mask_dlg_* 全屏弹窗 (新发现的 mask_dlg_1351 模式)
+                const maskDlgs = document.querySelectorAll('[id*="mask_dlg"]');
+                maskDlgs.forEach(d => { if (d.style) d.style.display = 'none'; });
+
+                // 5. 2026-06-13 新增: 兜底 - 隐藏所有 z-index > 1000 的 fixed/absolute 全屏 div
+                //    (DMP 后续改 ID/class 名也能被这条兜住)
+                const allDivs = document.querySelectorAll('div');
+                allDivs.forEach(d => {
+                    if (!d.style) return;
+                    const z = parseInt(window.getComputedStyle(d).zIndex || '0', 10);
+                    const pos = window.getComputedStyle(d).position;
+                    if (z > 1000 && (pos === 'fixed' || pos === 'absolute')) {
+                        const rect = d.getBoundingClientRect();
+                        // 只隐藏覆盖全屏的 (避免误伤日期选择器弹窗 days_mx_output_*)
+                        if (rect.width > window.innerWidth * 0.5 && rect.height > window.innerHeight * 0.5) {
+                            d.style.display = 'none';
+                        }
+                    }
+                });
             }""")
-            log("已尝试关闭可能遮挡的弹窗")
+            log("已尝试关闭可能遮挡的弹窗 (含 mask_dlg_ + z-index 兜底)")
             time.sleep(1)
         except Exception as e:
             log(f"关闭弹窗时出错（非关键）: {e}")

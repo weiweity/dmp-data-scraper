@@ -264,3 +264,22 @@ def test_find_date_trigger_multi_skips_l3_when_disabled(monkeypatch):
     scraper_mod._find_date_trigger_multi(mock_page)
     assert autoheal_called == [], "L3 should be skipped when DISABLE_DATEPICKER_AUTOHEAL=1"
     monkeypatch.delenv('DISABLE_DATEPICKER_AUTOHEAL')
+
+
+# ===== 弹窗关闭 mask_dlg_* (1 测试) =====
+def test_select_date_smart_v2_closes_mask_dlg_popups():
+    """select_date_smart_v2 弹窗关闭代码必须识别 mask_dlg_* (DMP 6/13 新弹窗模式)"""
+    import inspect
+
+    from core.dmp_item_insight_scraper import select_date_smart_v2
+    source = inspect.getsource(select_date_smart_v2)
+    # mask_dlg_* 必须在弹窗关闭的 JS 中 (page.evaluate 字符串)
+    assert "mask_dlg" in source, (
+        "mask_dlg_* 必须在 select_date_smart_v2 弹窗关闭逻辑中 "
+        "(DMP 6/13 新弹窗 mask_dlg_1351 之前被遗漏)"
+    )
+    # z-index 兜底也必须在
+    assert "z-index" in source or "zIndex" in source, (
+        "z-index 兜底必须在 select_date_smart_v2 中 "
+        "(DMP 后续改 ID/类名也能被这条兜住)"
+    )
