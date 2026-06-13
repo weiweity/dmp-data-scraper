@@ -239,7 +239,10 @@ except ImportError:
             return None, None
     
     def format_date_for_csv(dt):
-        return f"{dt.year}/{dt.month}/{dt.day}"
+        # 2026-06-13 改造（ERR-20260613-003）：保留前导零 (YYYY/MM/DD)
+        # 旧版 f"{dt.year}/{dt.month}/{dt.day}" 产生 '2026/5/21'，
+        # 字符串排序错乱（'2026/5/9' > '2026/5/10'），见 ERR-20260613-003
+        return dt.strftime('%Y/%m/%d')
     
     # parse_number 和 get_missing_dates 使用全局版本（见下方）
 
