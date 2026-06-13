@@ -4,6 +4,28 @@
 
 ---
 
+## [v0.1.11] - 2026-06-13 - fix(scraper): 弹窗关闭代码加 mask_dlg_* 匹配 + z-index 兜底 (修 DMP 新弹窗拦截)
+
+### 背景
+v0.1.9 修好 datepicker selector 后真实跑 6/1-6/3, 发现新阻塞: DMP 6/13 引入新弹窗 `<div id="mask_dlg_1351" class="asiYysqBfH asiYysqBfK">` 拦截 click. 旧弹窗关闭代码只识别 `wrapper_dlg_*` + `class*="mask|overlay"`, 没识别 `id*="mask_dlg_"`. v0.1.9 selector 命中但 click 被 mask_dlg_1351 拦截, scraper 卡 30s timeout.
+
+### Fixed
+- **core/dmp_item_insight_scraper.py:1136 弹窗关闭 JS 加 2 条新策略**:
+  - `[id*="mask_dlg"]` 匹配 (DMP 6/13 新弹窗模式)
+  - 通用兜底: 隐藏所有 z-index > 1000 且 fixed/absolute 且覆盖全屏的 div (DMP 后续再改 ID/类名也能被兜住, 不再被具体 ID 锁死)
+
+### Added
+- **core/tests/test_date_picker_selectors.py** 新增 `test_select_date_smart_v2_closes_mask_dlg_popups` 1 测试: 验证 select_date_smart_v2 含 `mask_dlg` 和 z-index 兜底.
+
+### 验证
+- `pytest core/tests/` → 95/95 passed (94 + 1)
+- 真实跑 6/1-6/3 (task #36) - 待运行, 期望 mask_dlg_1351 不再拦截 click
+
+### Lesson
+DMP 弹窗 ID 命名模式一直在变 (`wrapper_dlg_*` → `mask_dlg_*`), **别再硬编码具体 ID 模式**, 用 z-index 兜底更鲁棒. 同样教训适用于所有 DMP 元素选择.
+
+---
+
 ## [v0.1.10] - 2026-06-13 - fix(scraper): CSV 日期格式 YYYY/M/D → YYYY/MM/DD (字符串排序 = 时序排序)
 
 ### 背景
