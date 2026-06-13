@@ -677,12 +677,9 @@ def fetch_item_data(page, item_id, target_date, fallback_date):
                 return None
             data['item_id'] = item_id
             # selected_date在URL参数化方案中未定义，使用target_date作为默认值
-            # 格式化日期为字符串（%-m/%-d 不带前导零，与历史数据格式一致）
-            if hasattr(target_date, 'strftime'):
-                date_str = target_date.strftime('%Y/%-m/%-d')
-            else:
-                date_str = str(target_date)
-            data['date'] = date_str
+            # 2026-06-14 改造（ERR-20260613-003 后续）: 改用 format_date_for_csv (YYYY/MM/DD)
+            # 旧版 strftime('%-m/%-d') 产生 YYYY/M/D 格式, 字符串排序错乱 + 与 v0.1.10 改的 format_date_for_csv 不一致
+            data['date'] = format_date_for_csv(target_date)
 
             # 读取 SPA trigger 日期（用于 date_sanity 门禁校验 + 实际数据日期判断）
             try:
@@ -697,8 +694,9 @@ def fetch_item_data(page, item_id, target_date, fallback_date):
                         # 智能判断实际数据日期
                         # 场景 1: SPA 显示 "昨日" → 数据已刷新，实际日期 = T-1（昨天）
                         # 场景 2: SPA 显示具体日期（如 2026-06-11）→ 数据可能未刷新
+                        # 2026-06-14 改造（ERR-20260613-003 后续）: 改用 format_date_for_csv
                         today = datetime.now().date()
-                        yesterday_str = (today - timedelta(days=1)).strftime('%Y/%-m/%-d')
+                        yesterday_str = format_date_for_csv(today - timedelta(days=1))
 
                         if '昨日' in spa_date_text:
                             # SPA 显示"昨日"，实际数据日期是昨天
