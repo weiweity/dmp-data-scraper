@@ -4,6 +4,33 @@
 
 ---
 
+## [v0.1.14] - 2026-06-14 - fix(scraper): data['date'] 改用 format_date_for_csv (统一日期格式)
+
+### 背景
+6/14 跑批 6/1-6/12 共 180 行写入 CSV 后发现: 写入格式是 `2026/6/1` (无前导零), 不是 v0.1.10 改的 YYYY/MM/DD. 根因: `dmp_item_insight_scraper.py:682` 用 `strftime('%Y/%-m/%-d')` 强制无前导零, 绕过了 v0.1.10 改的 `format_date_for_csv`. 同样问题在 line 698 (Date Sanity Check 的 yesterday_str) 也存在.
+
+### Fixed
+- **dmp_item_insight_scraper.py:682** `data['date'] = target_date.strftime('%Y/%-m/%-d')` → `format_date_for_csv(target_date)`
+- **dmp_item_insight_scraper.py:698** `yesterday_str` 也改用 `format_date_for_csv`
+
+### Changed
+- **core/data3.csv**: 180 行 (6/1-6/12) 从 YYYY/M/D → YYYY/MM/DD normalize (本地迁移, 已替换原文件)
+
+### Added
+- **test_dmp_common.py** 新增 2 测试:
+  - `test_dmp_item_insight_data_date_uses_format_date_for_csv`: 验证 fetch_item_data 不再用 `%-m/%-d` strftime
+  - `test_format_date_for_csv_yyyymmdd`: 验证 format_date_for_csv 对 date/datetime 都产生 YYYY/MM/DD
+
+### 验证
+- `pytest core/tests/` → 97/97 passed (95 + 2 新)
+- CSV 7223 行 6/1-6/12 全部 YYYY/MM/DD 格式
+- 字符串排序 == 时序排序 ✅
+
+### Lesson
+**v0.1.10 改 format_date_for_csv 时漏了 fetch_item_data 写 CSV 的入口** (line 682/698). 修复源头函数后, 必须 grep 所有使用 strftime 日期格式的地方, 统一迁移. 测试 1 (source check) 防止再有人用 `%-m` 旧格式.
+
+---
+
 ## [v0.1.13] - 2026-06-14 - fix(scraper): datepicker trigger 用用户精确路径 [id^=trigger_mx_] > div > span.mx-trigger-label
 
 ### 背景
