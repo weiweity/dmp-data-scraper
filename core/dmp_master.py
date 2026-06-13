@@ -499,48 +499,8 @@ def run_items_module(page, username, password):
         log("单品洞察CSV已按日期排序")
     except Exception as e:
         log(f"排序CSV失败: {e}")
-    
+
     return success_count, len(tasks_to_run)
-
-
-def sync_to_frontend():
-    """
-    自动同步CSV数据文件到前端看板目录
-    抓取完成后自动调用，无需手动复制
-    """
-    import shutil
-    
-    # 数据文件列表
-    data_files = ['data.csv', 'data2.csv', 'data3.csv']
-    
-    # frontend目录：core的上一级就是DMP_test_package，下面是frontend
-    frontend_dir = os.path.join(os.path.dirname(Config._SCRIPT_DIR), 'frontend')
-    
-    log("\n" + "-" * 40)
-    log("同步数据到前端看板...")
-    log("-" * 40)
-    
-    if not os.path.exists(frontend_dir):
-        log(f"警告：前端目录不存在 {frontend_dir}，跳过同步")
-        return
-    
-    synced = 0
-    for f in data_files:
-        src = os.path.join(Config._SCRIPT_DIR, f)
-        dst = os.path.join(frontend_dir, f)
-        
-        if os.path.exists(src):
-            try:
-                shutil.copy2(src, dst)
-                log(f"  [OK] {f} -> frontend/")
-                synced += 1
-            except Exception as e:
-                log(f"  [FAIL] {f} 同步失败: {e}")
-        else:
-            log(f"  [SKIP] {f} 不存在，跳过")
-    
-    log(f"同步完成: {synced}/{len(data_files)} 个文件")
-    log("-" * 40)
 
 
 def main():
@@ -755,10 +715,7 @@ def main():
             
             log(f"\n总计: {total_success}/{total_tasks}")
             log("=" * 60)
-            
-            # 自动同步CSV到前端看板目录
-            sync_to_frontend()
-            
+
         except Exception as e:
             log(f"运行出错: {e}")
             import traceback

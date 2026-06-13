@@ -73,8 +73,8 @@ def log(msg):
 
 
 # ============ 配置类 (WAVE 1 已移到 config/settings.py, 顶部 from re-export) ============
-# Config class 完整定义在 scraper/core/config/settings.py
-# 这里通过 `from .config.settings import Config` 重新 export, 旧 import 路径仍可用
+# Config class 完整定义在 core/config/settings.py
+# 这里通过 `from core.config.settings import Config` 重新 export
 
 
 # ============ 编码检测 ============
@@ -93,13 +93,13 @@ def detect_encoding(file_path):
 
 # ============ 日期工具 (WAVE 1 已移到 utils/dates.py, 顶部 from re-export) ============
 # parse_date / format_date_for_csv / normalize_date_str / parse_number 完整定义在
-# scraper/core/utils/dates.py
-# 这里通过 `from .utils.dates import ...` 重新 export, 旧 import 路径仍可用
+# core/utils/dates.py
+# 这里通过 `from core.utils.dates import ...` 重新 export
 
 
 # ============ 账号读取 (WAVE 1 已移到 utils/account.py, 顶部 from re-export) ============
-# read_account 完整定义在 scraper/core/utils/account.py
-# 这里通过 `from .utils.account import read_account` 重新 export, 旧 import 路径仍可用
+# read_account 完整定义在 core/utils/account.py
+# 这里通过 `from core.utils.account import read_account` 重新 export
 # (下方保留 read_account 函数体仅为向后兼容, 实际 Wave 1 不再调用)
 
 

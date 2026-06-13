@@ -1,6 +1,6 @@
 """Sprint 16 Wave 1 — validator split. items_validators.py preserves 2026-06-01 hotfixes (_detect_copy_day, _check_api_health). LARK_ALERTS_ENABLED env var gates side effects for unit tests.
 
-5 gates from scraper/core/dmp_item_insight_scraper.py:2407-2508 (append_tocsv 5 gates):
+5 gates from core/dmp_item_insight_scraper.py:2407-2508 (append_tocsv 5 gates):
     a. validate_item_data        — fields not empty, IDs are strings
     b. validate_cross_day        — drop > 50% vs yesterday
     c. _check_api_health         — subfield sum ≤ total assets  (2026-06-01 hotfix)
@@ -291,7 +291,7 @@ def _send_lark_alert(content: str, open_id: str | None = None,
                      timeout: float = 5.0) -> tuple[bool, str]:
     """推 lark-cli 私聊告警（graceful degrade — never raises）。
 
-    复刻 scraper/core/sanity_check.py:46-109。
+    复刻 core/sanity_check.py:46-109。
     """
     oid = (open_id or os.environ.get("LARK_OPEN_ID", "")).strip()
     if not oid:

@@ -59,7 +59,7 @@ def test_config_load_items_invalid_schema_raises(tmp_path: Path) -> None:
 def test_config_class_attributes_unchanged() -> None:
     """Config class 静态属性 (跟原 dmp_common.Config 完全一致, 零行为变更)。"""
     # 路径常量 — 绝对路径, 跟原 dmp_common.Config 等价
-    # Sprint 5 #21 删内层 scraper/ 后, 路径结尾从 `/scraper/core` 改为 `/core`
+    # Sprint 5 #21 (v0.1.7) 删内层后, 路径结尾是 `/core`
     assert Config._SCRIPT_DIR.endswith('/core')
     assert Config.ASSETS_DATA_FILE.endswith('data2.csv')
     assert Config.FLOW_DATA_FILE.endswith('data.csv')

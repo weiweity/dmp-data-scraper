@@ -3,7 +3,7 @@
 > **适用场景**：单页应用（SPA）中的图表数据抓取
 > **创建时间**：2026-04-12
 > **关键字**：Network 拦截、API 逆向、SPA 爬虫、桑基图、Canvas 图表
-> **关联项目**：达摩盘数据采集（DMP_test_package）
+> **关联项目**：fuqing-scraper DMP 数据采集（独立 repo, v0.1.0）
 
 ---
 

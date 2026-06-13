@@ -32,7 +32,8 @@
 - 完整记录见 `CLAUDE.md` §6 Git 工作流
 
 ### 验证
-- 项目内跨项目引用: 0 ✅
+- 项目内跨项目引用 (DMP_test_package / scraper/core / frontend 等): v0.1.0 entry 写"0 ✅"是 **错误** (codex audit 后修), 实际 9 处以上 (sync_to_frontend / dmp_common 注释 / validators 注释 / conftest / test_settings / KB 关联 / FEATURE_REQUESTS / LEARNINGS)
+- v0.1.8 entry 修后实际 cross-ref 残留: 0 ✅ (本 entry 写时)
 - 残留目录: 0 ✅
 - `PYTHONPATH=. pytest core/tests/ -q` → 58/58 passed ✅
 

@@ -110,7 +110,6 @@ CLAUDE.md 准则: "禁止信'代码看起来对'" — Edit 报"成功"也算"看
 - **选择器机制**: CSS类名(mxa属性) → selectors.json 配置 → current + fallbacks 兜底
 - **提取策略**: 三层降级 — CSS选择器 → 语义文本匹配 → AI分析(MiniMax API)
 - **增量逻辑**: 读取CSV最新日期 → 计算到T-1/T-2的缺失日期 → 只补缺失的
-- **前端看板**: 纯静态HTML(index.html)，需手动同步CSV
 
 关键文件：
 - 统一入口: core/dmp_master.py (--assets/--flow/--items)
@@ -123,7 +122,6 @@ CLAUDE.md 准则: "禁止信'代码看起来对'" — Edit 报"成功"也算"看
 已知问题：
 1. selector_engine.py 有 Windows 硬编码路径（Mac 上 save_config 不生效）
 2. AIAgent API Key 明文写在代码中
-3. 前端 CSV 需手动同步，无自动备份
 
 ### Suggested Action
 按优先级逐步修复：路径硬编码 → API Key 环境化 → 自动同步脚本 → 定时任务

@@ -93,7 +93,7 @@ def validate_assets_total(row: dict) -> tuple[bool, str]:
 def check_date_sanity(date_str: str) -> tuple[bool, str]:
     """日期格式校验（YYYY/MM/DD 或 YYYY-MM-DD）。
 
-    复刻 scraper/core/sanity_check.py:161-188 check_date_sanity。
+    复刻 core/sanity_check.py:161-188 check_date_sanity。
     """
     if not date_str:
         return False, "date_str 为空"

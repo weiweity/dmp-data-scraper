@@ -1,4 +1,4 @@
-"""Shared pytest fixtures for scraper/core tests."""
+"""Shared pytest fixtures for core tests."""
 import os
 from pathlib import Path
 

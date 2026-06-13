@@ -140,7 +140,7 @@ def validate_xinzeng(row: dict) -> tuple[bool, str]:
 def check_date_sanity(date_str: str) -> tuple[bool, str]:
     """日期格式校验（YYYY/MM/DD 或 YYYY-MM-DD）。
 
-    复刻 scraper/core/sanity_check.py:161-188。
+    复刻 core/sanity_check.py:161-188。
     """
     if not date_str:
         return False, "date_str 为空"
