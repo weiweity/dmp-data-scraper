@@ -1020,38 +1020,72 @@ def _autoheal_find_trigger(page, candidates) -> tuple:
 def _find_date_trigger_multi(page, timeout=5000):
     """通过多种策略查找日期选择器触发元素，任一匹配即可
 
-    策略优先级（2026-06-13 修正 selector 错位，ERR-20260613-002）：
-    - 真实 DOM：#trigger_mx_44226 > div > span.mx-trigger-label
-    - 旧 selector（.mxgc-calendar-datepicker / class hash）已废弃，保留文本策略兜底
+    策略优先级（2026-06-13 修正 selector 错位，ERR-20260613-002 + trigger 选错修正）：
+    - 真实 DOM: #trigger_mx_NNNN > div > span.mx-trigger-label
+    - 页面上有 5+ 个 mx-trigger-label (同行同层/昨日/近30天/昨日/资产总体), .first 不一定是 datepicker
+    - 过滤: 排除"同行同层"+"资产总体"+"近N天" (这些是过滤下拉, 不是日期选择器)
+    - 选: 文本含"昨日" (上品资产分析/流转贡献分析的真 datepicker 文本都是"昨日")
     - 4 策略全失败时: L2 诊断 dump + L3 行为探测 auto-heal
 
     Returns:
         tuple: (element, strategy_name) 成功找到返回(element, strategy_name)，失败返回(None, None)
     """
+    # 2026-06-13 新策略 (最高优先): 找"昨日"trigger, 排除过滤下拉
+    # 这是 6/13 跑批发现 .first 抓错 (抓到"同行同层") 后的根因修复
+    EXCLUDE_TEXTS = {'同行同层', '资产总体', '近7天', '近30天', '今日实时', '自然月', '自然年'}
+
+    def _is_real_date_trigger(el):
+        if not el or not el.is_visible():
+            return False
+        text = (el.text_content() or '').strip()
+        if text in EXCLUDE_TEXTS:
+            return False
+        if text == '昨日' or '昨日' in text:
+            return True
+        return False
+
     strategies = [
-        # 策略1（最高优先）：span.mx-trigger-label — 真实触发器 class，跨刷新稳定
+        # 策略0a (2026-06-13 新增最高优先): 过滤后的"昨日" trigger
         {
-            'name': 'mx-trigger-label',
+            'name': 'yesterday-filtered-first',
             'locator': page.locator("span.mx-trigger-label").first,
-            'filter': lambda el: el.is_visible()
+            'filter': _is_real_date_trigger,
         },
-        # 策略2：ID 前缀兜底（mx_ 后是 counter，前缀稳定）
+        # 策略0b: 试 nth(1) 跳过"同行同层"
+        {
+            'name': 'yesterday-filtered-nth1',
+            'locator': page.locator("span.mx-trigger-label").nth(1),
+            'filter': _is_real_date_trigger,
+        },
+        # 策略0c: 试 nth(3) 中间位置
+        {
+            'name': 'yesterday-filtered-nth3',
+            'locator': page.locator("span.mx-trigger-label").nth(3),
+            'filter': _is_real_date_trigger,
+        },
+        # 策略1（保留旧版兼容）: 父类含 calendar-datepicker
+        {
+            'name': 'mx-trigger-label-calendar',
+            'locator': page.locator(".mxgc-calendar-datepicker span.mx-trigger-label").first,
+            'filter': lambda el: el.is_visible(),
+        },
+        # 策略2: ID 前缀兜底
         {
             'name': 'id-prefix-trigger-mx',
             'locator': page.locator("[id^='trigger_mx_'] span").first,
-            'filter': lambda el: el.is_visible()
+            'filter': lambda el: el.is_visible(),
         },
-        # 策略3：文本包含"昨日"（可能是显示文本，需配合其他策略）
+        # 策略3: 文本包含"昨日" (父 div)
         {
             'name': 'text-yesterday',
             'locator': page.locator("div:has-text('昨日')").first,
-            'filter': lambda el: el.is_visible() and '昨日' in (el.text_content() or '')
+            'filter': lambda el: el.is_visible() and '昨日' in (el.text_content() or ''),
         },
-        # 策略4：文本包含日期格式 2026-xx-xx
+        # 策略4: 文本包含日期格式 2026-xx-xx
         {
             'name': 'text-date-format',
             'locator': page.locator("div:has-text('2026-')").first,
-            'filter': lambda el: el.is_visible() and '2026-' in (el.text_content() or '')
+            'filter': lambda el: el.is_visible() and '2026-' in (el.text_content() or ''),
         },
     ]
 

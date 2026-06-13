@@ -4,6 +4,36 @@
 
 ---
 
+## [v0.1.12] - 2026-06-13 - fix(scraper): datepicker trigger 选错修正 (排除过滤下拉)
+
+### 背景
+v0.1.11 真实跑 6/1-6/3 时发现: 页面上有 5+ 个 `span.mx-trigger-label` 元素, scraper 用 `.first` 抓到的是"同行同层"过滤下拉 (y=170, 顶部), 不是真 datepicker. 真 datepicker 是 y=1357 中间位置的"昨日" trigger. 用户在浏览器里手动验证过真 trigger 在中间.
+
+### Fixed
+- **core/dmp_item_insight_scraper.py:1020 `_find_date_trigger_multi`** 加 3 条新策略 (3 个 "昨日" trigger 都试):
+  - 0a: `.first` + `_is_real_date_trigger` 过滤 (排除"同行同层"等)
+  - 0b: `.nth(1)` 跳过顶部过滤
+  - 0c: `.nth(3)` 中间位置 (用户指定)
+  - 1 (旧): 父类含 `.mxgc-calendar-datepicker` 兼容
+  - 2-4 (旧): ID 前缀 / 文本 / 日期格式 兜底
+- `_is_real_date_trigger` filter 函数: 排除 EXCLUDE_TEXTS = {同行同层, 资产总体, 近7天, 近30天, 今日实时, 自然月, 自然年}, 只接受文本含"昨日"或父类含 calendar 的 trigger
+
+### Changed
+- **core/tests/test_date_picker_selectors.py:69-104** `test_find_trigger_no_longer_uses_broken_class`:
+  - 允许 `.mxgc-calendar-datepicker span...` (父类上下文)
+  - 拒绝单独的 `.mxgc-calendar-datepicker` locator
+  - 验证 EXCLUDE_TEXTS 存在且含"同行同层"/"资产总体"
+
+### 验证
+- `pytest core/tests/` → 95/95 passed (无回归)
+- 真实跑 6/1-6/3: trigger 找到了, 但 date 点击后日期没真切换 (DMP 前端行为, Date Sanity Check 兜底拒绝污染, 0/45)
+- **结论**: DMP datepicker 点击行为需要更深层逆向 (待后续 sprint), 6/1-6/3 跑批改人工执行
+
+### Lesson
+不要假设 `.first` 是真 trigger, 同一个 class 出现在多个不同含义元素上 (过滤 vs 日期) 时必须按位置或文本过滤. 真实 DOM 探索 (列所有同类元素 + 位置) 比"找一个匹配"更重要.
+
+---
+
 ## [v0.1.11] - 2026-06-13 - fix(scraper): 弹窗关闭代码加 mask_dlg_* 匹配 + z-index 兜底 (修 DMP 新弹窗拦截)
 
 ### 背景
