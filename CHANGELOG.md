@@ -4,6 +4,59 @@
 
 ---
 
+## [v0.1.9] - 2026-06-13 - fix(scraper): DMP 单品洞察 datepicker selector 修复 + T-1 早退 + L2/L3 防御加固
+
+### 背景
+2026-06-13 跑批 0/60 失败, 根因是 `_find_date_trigger_multi` 4 策略全失败 (所有策略都未能找到日期选择器 + no-mxgc-calendar-datepicker). 用户在浏览器 DevTools 实测真实 DOM 后确认: 旧 selector (`.mxgc-calendar-datepicker` / class hash `dKqGwkfJcd`) 跟真实 DOM 不匹配. 同时 DMP 只在"昨日"自动渲染, 历史日期必须手动点 datepicker, 与用户"3 天连续上限 / 抗风控"硬约束冲突.
+
+### Fixed
+- **core/dmp_item_insight_scraper.py:798 `_find_date_trigger_multi`** 4 策略 selector 全部重写:
+  - P0: `span.mx-trigger-label` (语义 class 稳定, 跨刷新不变)
+  - P1: `[id^='trigger_mx_'] span` (ID 前缀稳定)
+  - P2: 文本"昨日" + 日期格式 (兜底)
+  - 去掉 `.mxgc-calendar-datepicker` 和 `[class*='calendar']` 错位策略
+- **core/dmp_item_insight_scraper.py:1054 `try_select_date_v2`** 弹窗 selector:
+  - 主选: `[id^='days_mx_output_']` (用户真实验证)
+  - 兜底: `.mx-output-bottom.mx-output-open` (class)
+- **core/dmp_item_insight_scraper.py:702 Date Sanity Check** 增强 T-1 宽容分支:
+  - `target_date == T-1 + SPA 显示"昨日"` → 走匹配通过 (不再"严重")
+  - 保留 `target_date == T-N + SPA 显示"昨日"` 拒绝写入 (数据污染防护)
+
+### Added
+- **T-1 早退**: 新增 `_should_skip_datepicker(target_date)` (dmp_item_insight_scraper.py:786)
+  - target_date == T-1 → 跳过 datepicker 调用 (SPA 默认就是 T-1)
+  - 减少 75% URL 请求, 大幅降低风控触发概率
+  - 与用户"3 天连续上限"硬约束完美对齐
+- **L2 防御 `_diagnose_datepicker`**: 4 策略全失败时 dump 5 类候选元素 JSON 到 `debug_dir/datepicker_diag_*.json` (mx-click / 昨日文本 / 日期文本 / ID 弹窗 / ID 日历). 下次 DMP 改 selector 时, 30 秒定位新 selector.
+- **L3 防御 `_autoheal_find_trigger`**: 行为探测 auto-heal. 找"点击后弹 `[id^='days_mx_output_']` 弹窗"的元素. 大多 DMP 改 selector 时自动自愈, 无需人工介入.
+- **env 开关 `DISABLE_DATEPICKER_AUTOHEAL=1`**: 关闭 L3 (保 disable 路径).
+- **3 天连续上限守卫** (`dmp_master.py:294` `MAX_BACKFILL_DAYS=2`): 距今 > 2 天的任务自动 skip + 提示 `BACKFILL_DAYS=90` 人工回填入口.
+- **scraping.date_strategy 节** (`core/config/items.yaml`): selector 策略 + backfill 配置 5 字段.
+- **core/tests/test_date_picker_selectors.py** (新, 14 tests): 4 个 T-1 早退 + 2 个 selector 修复 + 1 个 ID 前缀 + 1 个 yaml + 2 个 L2 dump + 2 个 L3 auto-heal + 2 个 L2/L3 集成.
+
+### Changed
+- **core/dmp_item_insight_scraper.py:419 `fetch_item_data`**: 加 T-1 早退分支 (在 select_date_smart_v2 调用前)
+
+### Lesson (沉淀到 .learnings/ERRORS.md ERR-20260613-002)
+**绝不再用动态 class hash** (dKqGwkfJcd / dKqGwkgPcd 这类) 做 selector.
+- ✅ 优先: 语义 class / ID 前缀 / 行为属性 (`mx-click` / `title="YYYY-MM-DD"`)
+- ✅ 防御: L2 dump + L3 auto-heal (即使 selector 再变也能恢复)
+- ❌ 弃用: 完整 class hash / 模糊 hash 匹配
+
+### 验证
+- `PYTHONPATH=. pytest core/tests/test_date_picker_selectors.py -v` → 14 passed
+- `PYTHONPATH=. pytest core/tests/ -q` → 91/91 passed (无回归)
+- `ruff check core/tests/test_date_picker_selectors.py` → All checks passed
+- 集成验证 (T-1 真实跑批, task #9): 留用户跑, 期望日志 `target_date == T-1 → 跳过 datepicker` + 15/15 成功
+
+### 风险与回滚
+- 风险: ID 前缀 `days_mx_output_` 未来变化 → 触发器找不到 → L2 dump + L3 自愈兜底
+- 风险: T+1 跨日数据未就绪 → T-1 整批空 → 1 天延迟重跑
+- 风险: `BACKFILL_DAYS` 误开 → 跑批全失败 → yaml 注释警告 + env 显式标注
+- 回滚: 所有改动 additive / 局部, `git revert` 干净
+
+---
+
 ## [v0.1.8] - 2026-06-13 - chore(scraper): 彻底独立 + 启用 v0.1.x 方案 + Git 工作流新增
 
 ### 背景
