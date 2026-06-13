@@ -290,13 +290,31 @@ def run_items_module(page, username, password):
     # === 断点续传：加载已完成的任务 ===
     completed_items = dmp_item_insight_scraper._load_completed_items()
     log(f"已完成缓存中已有 {len(completed_items)} 条记录")
-    
+
+    # === 2026-06-13 新增（ERR-20260613-002）：3 天连续上限守卫 ===
+    # 默认只跑 2 天内（today, yesterday），距今 > 2 天的任务自动 skip
+    # 人工历史回填：设 BACKFILL_DAYS=90 关闭此守卫
+    backfill_override = os.environ.get('BACKFILL_DAYS')
+    max_backfill_days = int(os.environ.get('MAX_BACKFILL_DAYS', '2'))
+    if not backfill_override:
+        from datetime import date as _date
+        today = _date.today()
+        before_guard = len(tasks)
+        tasks = [
+            t for t in tasks
+            if (today - t['target_date'].date() if hasattr(t['target_date'], 'date') else today - t['target_date']).days <= max_backfill_days
+        ]
+        skipped_old = before_guard - len(tasks)
+        if skipped_old > 0:
+            log(f"⚠️ 3 天连续上限守卫：跳过 {skipped_old} 条距今 > {max_backfill_days} 天的任务")
+            log(f"   (设 BACKFILL_DAYS=90 可开启历史回填模式)")
+
     # 过滤掉已完成的任務
     tasks_to_run = [t for t in tasks if (t['item_id'], t['date_str']) not in completed_items]
     skipped_count = len(tasks) - len(tasks_to_run)
     if skipped_count > 0:
         log(f"断点续传：跳过 {skipped_count} 条已完成的任务，剩余 {len(tasks_to_run)} 条")
-    
+
     if not tasks_to_run:
         log("所有任务均已完成，无需抓取")
         return 0, 0
@@ -377,6 +395,18 @@ def run_items_module(page, username, password):
                             log(f"⚠️ 6 道门禁失败 ({len(failed_names)}/6): {failed_names}，"
                                 f"标 data_quality_flag=likely-wrong，"
                                 f"webhook={'已发' if sanity_result['alert']['sent'] else sanity_result['alert']['reason']}")
+
+                        # 数据刷新状态监控
+                        if data.get('_data_refresh_status'):
+                            status = data['_data_refresh_status']
+                            actual_date = data.get('_actual_data_date', 'unknown')
+                            if status == 'refreshed':
+                                log(f"📊 数据状态: 已刷新，实际数据日期={actual_date}")
+                            elif data.get('_date_mismatch'):
+                                log(f"⚠️ 数据状态: 日期不匹配，{data.get('_date_mismatch_reason')}")
+                                log(f"   → 实际数据日期={actual_date}，记录日期={date_str_task}")
+                            elif status == 'matched':
+                                log(f"✓ 数据状态: 日期匹配，实际数据日期={actual_date}")
                     except Exception as sc_err:
                         # sanity_check 异常 → 不影响主流程，仅记录
                         log(f"⚠️ sanity_check.run_all 异常（不阻塞写入）: {sc_err}")
@@ -410,7 +440,16 @@ def run_items_module(page, username, password):
     log(f"\n单品洞察第一轮完成: 成功 {success_count}/{len(tasks_to_run)}")
     if fail_tasks:
         log(f"失败任务数: {len(fail_tasks)}")
-        
+        # 打印失败列表（人工补用）
+        log("失败任务列表（人工补）:")
+        for t in fail_tasks:
+            log(f"  - 商品 {t['item_id']} 日期 {t['date_str']}")
+
+        # SKIP_RETRY=true 时跳过 60 秒重试（3 天量级可接受失败 + 人工补）
+        if os.environ.get('SKIP_RETRY', '').lower() == 'true':
+            log("⚠️ SKIP_RETRY=true，跳过 60 秒重试（按用户决策：接受失败 + 人工补）")
+            return success_count, len(tasks_to_run)
+
         # ========== 失败重试机制（2026-05-20新增） ==========
         # 05-07 证据：早上12:00 10个商品失败(总资产=0)，下午17:17 全部成功
         # 根因：达摩盘部分商品数据T+1生成有延迟，不是商品问题，是时间问题
@@ -492,6 +531,12 @@ def run_items_module(page, username, password):
     
     if fail_tasks:
         log(f"最终失败任务数: {len(fail_tasks)}")
+        # 再次打印最终失败列表（清晰可读）
+        log("=" * 50)
+        log("【最终失败任务清单 - 需人工补】")
+        for t in fail_tasks:
+            log(f"  - 商品 {t['item_id']} 日期 {t['date_str']}")
+        log("=" * 50)
     
     # 抓取完成后统一排序CSV（append_to_csv改为追加模式后的性能优化）
     try:

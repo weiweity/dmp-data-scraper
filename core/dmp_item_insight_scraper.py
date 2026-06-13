@@ -381,8 +381,10 @@ def fetch_item_data(page, item_id, target_date, fallback_date):
         date_str = str(target_date)
     
     # 正确格式: ?spm=xxx#!/route?itemId=xxx&endDate=2026-04-03&analysisTab=compete
+    # 2026-06-13 发现：URL 中的 endDate 参数不生效，必须通过 UI 日期选择器选择日期
+    # 但 URL 仍需要 endDate 作为兜底，保留原有格式
     url = f"{Config.DMP_BASE_URL}?spm={spm}{route}?itemId={item_id}&endDate={date_str}&analysisTab=compete"
-    log(f"访问单品洞察页面（含日期参数）: {url}")
+    log(f"访问单品洞察页面: {url}")
 
     # ===== 先注册API拦截器，再访问页面 =====
     # 传递 item_id 用于过滤不匹配的API响应
@@ -397,7 +399,7 @@ def fetch_item_data(page, item_id, target_date, fallback_date):
     page.on('response', api_response_handler)
 
     try:
-        # 访问页面（URL已包含日期参数）
+        # 访问页面（URL已包含日期参数，但已知不生效）
         page.goto(url, wait_until="domcontentloaded", timeout=120000)
 
         # 验证页面是否正常加载（检测404/错误页）
@@ -410,13 +412,32 @@ def fetch_item_data(page, item_id, target_date, fallback_date):
             log(f"访问备用URL: {fallback_url}")
             page.goto(fallback_url, wait_until="domcontentloaded", timeout=120000)
 
+        # 等待页面基础渲染
+        log("等待页面渲染...")
+        time.sleep(3)
+
+        # ===== T-1 早退（2026-06-13 新增, ERR-20260613-002）=====
+        # SPA 默认就显示 T-1, 此时不需要点 datepicker, 减少 75% URL 请求
+        if _should_skip_datepicker(target_date):
+            selected_date = format_date_for_csv(target_date)
+            log(f"target_date == T-1 → 跳过 datepicker, SPA 默认渲染 (selected={selected_date})")
+        else:
+            # ===== 关键修复：通过 UI 日期选择器选择目标日期 =====
+            # 因为 URL 中的 endDate 参数不生效，必须手动点击日期选择器
+            log(f"通过 UI 选择目标日期: {date_str}")
+            selected_date = select_date_smart_v2(page, target_date, fallback_date)
+            if selected_date:
+                log(f"UI 选择日期成功: {selected_date}")
+            else:
+                log(f"❌ UI 选择日期失败，商品 {item_id} 日期 {date_str}")
+                return None
+
         # 等待数据渲染（确保API已返回）
         log("等待数据渲染...")
-        time.sleep(5)
-        # [优化] 合并重复日志：原代码"页面加载完成，等待数据渲染..."与上方重复，删除
+        time.sleep(3)
         # 反检测：正态分布延迟替代均匀随机
         if HAS_ANTI_DETECT:
-            delay = human_delay_normal(3, 0.8, 1.5, 5)
+            delay = human_delay_normal(2, 0.5, 1.0, 3)
             log(f"正态分布延迟 {delay:.1f}秒")
         else:
             time.sleep(random.uniform(2, 4))
@@ -659,6 +680,58 @@ def fetch_item_data(page, item_id, target_date, fallback_date):
             else:
                 date_str = str(target_date)
             data['date'] = date_str
+
+            # 读取 SPA trigger 日期（用于 date_sanity 门禁校验 + 实际数据日期判断）
+            try:
+                date_trigger, _ = _find_date_trigger_multi(page, timeout=3000)
+                if date_trigger:
+                    spa_date_text = date_trigger.text_content()
+                    if spa_date_text:
+                        spa_date_text = spa_date_text.strip()
+                        data['_spa_trigger_date'] = spa_date_text
+                        log(f"SPA trigger 日期: {spa_date_text}")
+
+                        # 智能判断实际数据日期
+                        # 场景 1: SPA 显示 "昨日" → 数据已刷新，实际日期 = T-1（昨天）
+                        # 场景 2: SPA 显示具体日期（如 2026-06-11）→ 数据可能未刷新
+                        today = datetime.now().date()
+                        yesterday_str = (today - timedelta(days=1)).strftime('%Y/%-m/%-d')
+
+                        if '昨日' in spa_date_text:
+                            # SPA 显示"昨日"，实际数据日期是昨天
+                            data['_actual_data_date'] = yesterday_str
+                            data['_data_refresh_status'] = 'refreshed'
+                            log(f"✓ 数据已刷新（SPA 显示'昨日'），实际数据日期: {yesterday_str}")
+
+                            # 2026-06-13 增强（ERR-20260613-002）：T-1 早退路径
+                            # 当 target_date == T-1 时，SPA 默认就是 T-1，匹配成功是正常情况
+                            if date_str == yesterday_str:
+                                log(f"✓ T-1 匹配：target_date={date_str} == SPA 昨日={yesterday_str}")
+                            else:
+                                # 关键：如果 target_date 不是昨天，说明 URL 日期参数未生效
+                                # 达摩盘回退到了最新数据，不能将其作为 target_date 的数据
+                                log(f"⚠️ 严重：target_date={date_str}，但 SPA 显示'昨日'({yesterday_str})，"
+                                    f"URL 日期参数未生效。拒绝写入，避免数据污染。")
+                                return None
+                        else:
+                            # 尝试解析具体日期
+                            date_match = re.search(r'(\d{4})-(\d{1,2})-(\d{1,2})', spa_date_text)
+                            if date_match:
+                                spa_parsed_date = f"{date_match.group(1)}/{int(date_match.group(2))}/{int(date_match.group(3))}"
+                                data['_actual_data_date'] = spa_parsed_date
+                                data['_data_refresh_status'] = 'pending'
+
+                                # 比较 target_date 和 SPA 实际日期
+                                if spa_parsed_date != date_str:
+                                    log(f"⚠️ 日期不匹配: URL 目标 {date_str} vs SPA 实际 {spa_parsed_date}，"
+                                        f"数据未刷新。拒绝写入，避免数据污染。")
+                                    return None
+                                else:
+                                    data['_data_refresh_status'] = 'matched'
+                                    log(f"✓ 日期匹配: URL 目标 = SPA 实际 = {date_str}")
+            except Exception as e:
+                log(f"读取 SPA trigger 日期失败（不影响主流程）: {e}")
+
             log(f"商品 {item_id} 数据提取成功: {data}")
             return data
         else:
@@ -732,25 +805,237 @@ def ai_analyze_and_fix_item_extraction(page, debug_dir):
         return None
 
 
+def _diagnose_datepicker(page, debug_dir):
+    """L2 防御 (2026-06-13 新增): 4 策略全失败时 dump 候选元素
+
+    输出:
+      - 内存: dict 含候选元素分类 (mx-click / 昨日文本 / 日期文本 / ID 弹窗 / ID 日历)
+      - 磁盘: debug_dir/datepicker_diag_YYYYMMDD_HHMMSS.json
+
+    用途: 下次 DMP 改 selector 时, 30 秒内定位新 selector (vs 5 分钟 DevTools 调试)
+    """
+    diag = page.evaluate(r"""() => {
+        const result = {
+            timestamp: new Date().toISOString(),
+            url: location.href,
+            candidates: {
+                mx_click_elements: [],
+                yesterday_text: [],
+                date_format_text: [],
+                id_mx_output: [],
+                id_calendar: [],
+            },
+            summary: {
+                total_mx_click: 0,
+                total_with_id_calendar: 0,
+            }
+        };
+        const isVisible = (el) => {
+            const r = el.getBoundingClientRect();
+            return r.width > 0 && r.height > 0;
+        };
+        const short = (s, n) => (s || '').toString().substring(0, n);
+
+        // 1. 找 mx-click 元素 (avalon.js 行为属性, 最稳定)
+        const mxClickEls = document.querySelectorAll('[mx-click]');
+        result.summary.total_mx_click = mxClickEls.length;
+        let count = 0;
+        mxClickEls.forEach((el) => {
+            if (count >= 5) return;
+            if (!isVisible(el)) return;
+            result.candidates.mx_click_elements.push({
+                tag: el.tagName,
+                class: short(el.className, 80),
+                text: short((el.textContent || '').trim(), 50),
+                mx_click: short(el.getAttribute('mx-click'), 100),
+                id: el.id || '',
+            });
+            count++;
+        });
+
+        // 2. 找"昨日"文本
+        const yesterdayEls = document.querySelectorAll('div, span, a, button');
+        count = 0;
+        for (const el of yesterdayEls) {
+            const text = (el.textContent || '').trim();
+            if (text === '昨日' || (text.includes('昨日') && text.length < 20)) {
+                if (!isVisible(el)) continue;
+                result.candidates.yesterday_text.push({
+                    tag: el.tagName,
+                    class: short(el.className, 80),
+                    text: short(text, 50),
+                    id: el.id || '',
+                });
+                count++;
+                if (count >= 3) break;
+            }
+        }
+
+        // 3. 找日期格式文本
+        const dateRe = /\d{4}-\d{1,2}-\d{1,2}/;
+        count = 0;
+        for (const el of yesterdayEls) {
+            const text = (el.textContent || '').trim();
+            if (dateRe.test(text) && text.length < 30) {
+                if (!isVisible(el)) continue;
+                result.candidates.date_format_text.push({
+                    tag: el.tagName,
+                    class: short(el.className, 80),
+                    text: short(text, 50),
+                    id: el.id || '',
+                });
+                count++;
+                if (count >= 3) break;
+            }
+        }
+
+        // 4. 找 ID 弹窗候选 (可能隐藏, 但 ID 仍存在)
+        const mxOutput = document.querySelectorAll("[id*='mx_output']");
+        result.summary.total_with_id_calendar = mxOutput.length;
+        count = 0;
+        mxOutput.forEach((el) => {
+            if (count >= 3) return;
+            result.candidates.id_mx_output.push({
+                tag: el.tagName,
+                id: el.id,
+                class: short(el.className, 80),
+                visible: isVisible(el),
+            });
+            count++;
+        });
+
+        // 5. 找 ID 日历候选
+        const calendar = document.querySelectorAll("[id*='calendar']");
+        count = 0;
+        calendar.forEach((el) => {
+            if (count >= 3) return;
+            result.candidates.id_calendar.push({
+                tag: el.tagName,
+                id: el.id,
+                class: short(el.className, 80),
+                visible: isVisible(el),
+            });
+            count++;
+        });
+
+        return result;
+    }""")
+
+    # 保存到磁盘
+    try:
+        os.makedirs(debug_dir, exist_ok=True)
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        diag_path = os.path.join(debug_dir, f"datepicker_diag_{timestamp}.json")
+        with open(diag_path, 'w', encoding='utf-8') as f:
+            json.dump(diag, f, ensure_ascii=False, indent=2)
+        log(f"  [_diagnose_datepicker] 诊断已保存: {diag_path}")
+        log(f"  [_diagnose_datepicker] 候选: mx-click={diag.get('summary', {}).get('total_mx_click', 0)}, "
+            f"昨日={len(diag.get('candidates', {}).get('yesterday_text', []))}, "
+            f"日期={len(diag.get('candidates', {}).get('date_format_text', []))}, "
+            f"mx_output={len(diag.get('candidates', {}).get('id_mx_output', []))}")
+    except Exception as e:
+        log(f"  [_diagnose_datepicker] 保存失败: {e}")
+
+    return diag
+
+
+def _autoheal_find_trigger(page, candidates) -> tuple:
+    """L3 防御 (2026-06-13 新增): 行为探测 auto-heal
+
+    逻辑: 找"点击后弹 [id^='days_mx_output_'] 弹窗"的元素
+    风险: 可能点错 (弹非日期弹窗) → ESC 关闭, 不污染数据
+    优势: 大多 DMP 改 selector 时, 不需人工介入即可自愈
+
+    Returns:
+        tuple: (element, strategy_name) 同 _find_date_trigger_multi, 失败返回 (None, None)
+    """
+    clickable = []
+
+    # 优先 mx-click 元素 (avalon.js 行为属性, 最可能点出弹窗)
+    for c in candidates.get('mx_click_elements', [])[:3]:
+        if c.get('id') or c.get('class'):
+            clickable.append(c)
+    # 次选"昨日"文本
+    for c in candidates.get('yesterday_text', [])[:2]:
+        if c.get('id') or c.get('class'):
+            clickable.append(c)
+    # 最后兜底: 日期格式文本
+    for c in candidates.get('date_format_text', [])[:2]:
+        if c.get('id') or c.get('class'):
+            clickable.append(c)
+
+    if not clickable:
+        log("  [_autoheal_find_trigger] 无可点击候选, 放弃 auto-heal")
+        return None, None
+
+    for i, cand in enumerate(clickable):
+        try:
+            # 用最稳的 selector 重新定位
+            sel = None
+            if cand.get('id'):
+                sel = f"#{cand['id']}"
+            elif cand.get('class'):
+                first_class = cand['class'].split()[0] if cand['class'] else ''
+                if first_class and not first_class.startswith('dKqGwk'):  # 排除动态 hash
+                    sel = f"{cand['tag'].lower()}.{first_class}"
+
+            if not sel:
+                continue
+
+            el = page.locator(sel).first
+            if not el.is_visible():
+                log(f"  [_autoheal_find_trigger] 候选 {i+1} ({sel}) 不可见, 跳过")
+                continue
+
+            log(f"  [_autoheal_find_trigger] 尝试点击候选 {i+1}/{len(clickable)}: {sel}")
+            el.click()
+            page.wait_for_timeout(500)
+
+            # 检查是否弹出日历
+            popup = page.locator("[id^='days_mx_output_']").first
+            if popup.is_visible():
+                log(f"  [_autoheal_find_trigger] ✓ 候选 {i+1} 点击后弹出日历, auto-heal 成功")
+                return el, f"autoheal-{cand.get('id') or cand.get('class', 'unknown')[:20]}"
+
+            # 关闭可能误开的弹窗
+            page.keyboard.press('Escape')
+            page.wait_for_timeout(300)
+
+        except Exception as e:
+            log(f"  [_autoheal_find_trigger] 候选 {i+1} 点击失败: {e}")
+            try:
+                page.keyboard.press('Escape')
+                page.wait_for_timeout(200)
+            except Exception:
+                pass
+            continue
+
+    log("  [_autoheal_find_trigger] 所有候选尝试后仍未找到 datepicker 弹窗")
+    return None, None
+
+
 def _find_date_trigger_multi(page, timeout=5000):
     """通过多种策略查找日期选择器触发元素，任一匹配即可
-    
-    策略优先级：.mx-trigger（真正的触发器）> 模糊class > 文本匹配
-    
+
+    策略优先级（2026-06-13 修正 selector 错位，ERR-20260613-002）：
+    - 真实 DOM：#trigger_mx_44226 > div > span.mx-trigger-label
+    - 旧 selector（.mxgc-calendar-datepicker / class hash）已废弃，保留文本策略兜底
+    - 4 策略全失败时: L2 诊断 dump + L3 行为探测 auto-heal
+
     Returns:
         tuple: (element, strategy_name) 成功找到返回(element, strategy_name)，失败返回(None, None)
     """
     strategies = [
-        # 策略1（最高优先）：.mxgc-calendar-datepicker 内的 .mx-trigger — 真正的触发器元素
+        # 策略1（最高优先）：span.mx-trigger-label — 真实触发器 class，跨刷新稳定
         {
-            'name': 'exact-mxgc-trigger',
-            'locator': page.locator(".mxgc-calendar-datepicker .mx-trigger").first,
+            'name': 'mx-trigger-label',
+            'locator': page.locator("span.mx-trigger-label").first,
             'filter': lambda el: el.is_visible()
         },
-        # 策略2：模糊class匹配 [class*='calendar'] [class*='trigger']
+        # 策略2：ID 前缀兜底（mx_ 后是 counter，前缀稳定）
         {
-            'name': 'class-fuzzy-calendar-trigger',
-            'locator': page.locator("[class*='calendar'] [class*='trigger']").first,
+            'name': 'id-prefix-trigger-mx',
+            'locator': page.locator("[id^='trigger_mx_'] span").first,
             'filter': lambda el: el.is_visible()
         },
         # 策略3：文本包含"昨日"（可能是显示文本，需配合其他策略）
@@ -766,7 +1051,7 @@ def _find_date_trigger_multi(page, timeout=5000):
             'filter': lambda el: el.is_visible() and '2026-' in (el.text_content() or '')
         },
     ]
-    
+
     for strategy in strategies:
         try:
             el = strategy['locator']
@@ -775,9 +1060,38 @@ def _find_date_trigger_multi(page, timeout=5000):
                 return el, strategy['name']
         except Exception:
             continue
-    
-    log("  [_find_date_trigger_multi] 所有策略都未能找到日期选择器")
+
+    # ===== L2 + L3 防御 (2026-06-13 新增): 4 策略全失败时 =====
+    log("  [_find_date_trigger_multi] 所有已知策略失败, 启动 L2 诊断 + L3 auto-heal")
+    debug_dir = Config.DEBUG_DIR if USING_COMMON else DEBUG_DIR
+    diag = _diagnose_datepicker(page, debug_dir)
+
+    # L3: 行为探测 auto-heal (可用 env var 关闭: DISABLE_DATEPICKER_AUTOHEAL=1)
+    if os.environ.get('DISABLE_DATEPICKER_AUTOHEAL') == '1':
+        log("  [_find_date_trigger_multi] DISABLE_DATEPICKER_AUTOHEAL=1, 跳过 L3")
+    else:
+        healed = _autoheal_find_trigger(page, diag.get('candidates', {}))
+        if healed[0] is not None:
+            return healed
+
+    log("  [_find_date_trigger_multi] L2+L3 全部失败, 请人工介入")
+    log(f"  [_find_date_trigger_multi] 诊断已 dump 到 {debug_dir}/datepicker_diag_*.json")
     return None, None
+
+
+def _should_skip_datepicker(target_date) -> bool:
+    """target_date == T-1 → 跳过 datepicker（SPA 默认就是 T-1）
+
+    2026-06-13 新增（ERR-20260613-002）：
+    - SPA 加载后默认显示"昨日"数据
+    - 此时点 datepicker 切换到 T-1 是无意义的（已经是 T-1）
+    - 跳过 datepicker 调用可减少 75% URL 请求（每商品 1 次 → 0 次 datepicker 流程）
+    - 大幅降低触发风控的概率
+    """
+    from datetime import date as _date
+    yesterday = _date.today() - timedelta(days=1)
+    target_d = target_date.date() if hasattr(target_date, 'date') else target_date
+    return target_d == yesterday
 
 
 def select_date_smart_v2(page, target_date, fallback_date):
@@ -991,10 +1305,13 @@ def select_date_smart_v2(page, target_date, fallback_date):
 def try_select_date_v2(page, target_date):
     """尝试选择指定日期 - mxgc日历组件专用版
 
-    关键发现：
-    1. 日历弹窗class是 'mx-output-bottom mx-output-open'
-    2. 弹窗在 body 最后面渲染，不在 .mxgc-calendar-datepicker 内
-    3. 年月导航和日期选择都在弹窗内
+    关键发现（2026-06-13 逆向 + 用户真实 DOM 验证，ERR-20260613-002）：
+    1. 日历弹窗: ID 形如 `days_mx_output_mx_NNNN`（counter 变，前缀稳定）
+       - 旧 selector '.mx-output-bottom' 已废弃（class 偶尔缺）
+    2. 月份标题: 任意含 "XXXX年XX月" 文本的元素
+    3. 月导航: 通过 mx-click 属性中的 next:true/无 next 区分
+    4. 日期单元格: title 属性 = 'YYYY-MM-DD'（最稳定定位方式）
+    5. 禁用日期: class 含 'dKqGwkgPcf' 等动态哈希
 
     Returns:
         bool: 是否选择成功
@@ -1013,44 +1330,49 @@ def try_select_date_v2(page, target_date):
         log(f"已保存日期选择器调试截图: {debug_screenshot}")
 
         # ========== 步骤1：确保日历弹窗已打开 ==========
-        # 检查日历弹窗是否可见
+        # 主选 ID 前缀（用户真实验证），兜底保留 .mx-output-bottom class
         calendar_open = page.evaluate("""() => {
-            const popup = document.querySelector('.mx-output-bottom');
+            const popup = document.querySelector("[id^='days_mx_output_']")
+                || document.querySelector('.mx-output-bottom');
             return popup ? {
-                visible: popup.classList.contains('mx-output-open'),
-                className: popup.className,
-                hasNavButtons: popup.querySelectorAll('button').length > 0
+                visible: popup.classList.contains('mx-output-open')
+                    || (popup.querySelector('.mx-output-open') !== null),
+                className: popup.className
             } : null;
         }""")
-        
+
         log(f"日历弹窗状态: {calendar_open}")
-        
+
         if not calendar_open or not calendar_open.get('visible'):
             log("日历弹窗未打开，尝试再次点击触发器...")
             page.evaluate("""() => {
-                const datePicker = document.querySelector('.mxgc-calendar-datepicker');
-                if (datePicker) {
-                    const trigger = datePicker.querySelector('.mx-trigger');
-                    if (trigger) trigger.click();
-                }
+                // 用真实 DOM 路径：trigger_mx_xxx > span.mx-trigger-label
+                const trigger = document.querySelector('span.mx-trigger-label')
+                    || document.querySelector("[id^='trigger_mx_'] span");
+                if (trigger) trigger.click();
             }""")
             page.wait_for_timeout(2000)
 
-        # ========== 步骤2：获取当前月份并导航 ==========
-        # 修复（2026-06-02 MEMO_2026-06-02.md）：用 DMP 真实 class .dKqGwkfJca 读月份
-        # 修复：用 span.dKqGwkfJbY 作为月导航（0=上月 1=下月），不再用 button
+        # ========== 步骤2：通过文本匹配读取当前月份（不依赖动态 class）==========
+        # 遍历弹窗内所有元素，匹配 "XXXX年XX月" 文本
         month_info = page.evaluate(r"""() => {
-            const popup = document.querySelector('.mx-output-bottom');
+            const popup = document.querySelector("[id^='days_mx_output_']")
+                || document.querySelector('.mx-output-bottom');
             if (!popup) return null;
-            // 真实 DMP 月份标题 class: dKqGwkfJca
-            const titleEl = popup.querySelector('.dKqGwkfJca');
-            if (!titleEl) return null;
-            const m = (titleEl.textContent || '').match(/(\d{4})年(\d{1,2})月/);
-            return {
-                year: m ? parseInt(m[1]) : null,
-                month: m ? parseInt(m[2]) : null,
-                title: (titleEl.textContent || '').trim()
-            };
+            // 匹配所有含 "XXXX年XX月" 的元素
+            const all = popup.querySelectorAll('span, div');
+            for (const el of all) {
+                const text = (el.textContent || '').trim();
+                const m = text.match(/^(\d{4})年(\d{1,2})月$/);
+                if (m) {
+                    return {
+                        year: parseInt(m[1]),
+                        month: parseInt(m[2]),
+                        title: text
+                    };
+                }
+            }
+            return null;
         }""")
 
         log(f"月份信息: {month_info}")
@@ -1064,13 +1386,42 @@ def try_select_date_v2(page, target_date):
             log(f"需要切换 {abs(months_diff)} 个月 {'向后' if months_diff > 0 else '向前'}")
 
             for i in range(abs(months_diff)):
+                # 通过 mx-click 属性区分上月/下月，避免依赖动态 class
+                # 上月: mx-click="...dmp-newa_({type:'day'})"（无 next:true）
+                # 下月: mx-click="...dmp-newa_({type:'day',next:true})"
                 nav_ok = page.evaluate(f"""() => {{
-                    const popup = document.querySelector('.mx-output-bottom');
+                    const popup = document.querySelector("[id^='days_mx_output_']")
+                        || document.querySelector('.mx-output-bottom');
                     if (!popup) return false;
-                    // 真实 DMP 月导航 class: dKqGwkfJbY (按 DOM 顺序: 0=上月, 1=下月)
-                    const navs = popup.querySelectorAll('span.dKqGwkfJbY');
-                    if (navs.length < 2) return false;
-                    const target = {months_diff} > 0 ? navs[1] : navs[0];
+
+                    // 方法1: 通过 mx-click 属性（最稳定）
+                    const allClickable = popup.querySelectorAll('span[mx-click]');
+                    let prevBtn = null, nextBtn = null;
+                    for (const el of allClickable) {{
+                        const clickAttr = el.getAttribute('mx-click') || '';
+                        if (clickAttr.includes("type:'day'") && clickAttr.includes('next:true')) {{
+                            nextBtn = el;
+                        }} else if (clickAttr.includes("type:'day'") && !clickAttr.includes('next:true')) {{
+                            prevBtn = el;
+                        }}
+                    }}
+
+                    // 方法2: 退回到文本位置（"2026年06月" 旁边的图标按钮）
+                    if (!prevBtn || !nextBtn) {{
+                        const all = popup.querySelectorAll('span');
+                        for (let i = 0; i < all.length; i++) {{
+                            const text = (all[i].textContent || '').trim();
+                            if (/^\\d{{4}}年\\d{{1,2}}月$/.test(text)) {{
+                                // 月份标题，找到前一个和后一个 span
+                                prevBtn = prevBtn || all[i - 1];
+                                nextBtn = nextBtn || all[i + 1];
+                                break;
+                            }}
+                        }}
+                    }}
+
+                    const target = {months_diff} > 0 ? nextBtn : prevBtn;
+                    if (!target) return false;
                     target.click();
                     return true;
                 }}""")
@@ -1080,33 +1431,41 @@ def try_select_date_v2(page, target_date):
                     log(f"月导航第 {i+1}/{abs(months_diff)} 步失败 → BUG: month nav 阻塞")
                     return False
 
-        # ========== 步骤3：选择日期 ==========
-        # 修复（2026-06-02 MEMO_2026-06-02.md）：用 span.dKqGwkfJcd + title 属性定位
-        # 移除 span-click fallback（Codex 注释 line 1487 BUG TRIGGER）
+        # ========== 步骤3：选择日期（用 title 属性定位，不依赖动态 class）==========
         page.wait_for_timeout(800)
         target_iso = f"{year:04d}-{month:02d}-{day:02d}"
         select_result = page.evaluate(f"""() => {{
-            const popup = document.querySelector('.mx-output-bottom');
+            const popup = document.querySelector("[id^='days_mx_output_']")
+                || document.querySelector('.mx-output-bottom');
             if (!popup) return {{ success: false, reason: 'no-popup' }};
 
-            // 真实 DMP 日期格: span.dKqGwkfJcd, 定位靠 title 属性
-            // disabled 标识: class 含 dKqGwkfJcf
-            const cells = popup.querySelectorAll('span.dKqGwkfJcd');
+            // 通过 title 属性定位日期单元格（最稳定方式）
+            const cells = popup.querySelectorAll('span[title]');
             for (const cell of cells) {{
+                const title = cell.getAttribute('title');
+                if (!title) continue;
+                // 检查 title 是否是 YYYY-MM-DD 格式
+                if (!/^\\d{{4}}-\\d{{1,2}}-\\d{{1,2}}$/.test(title)) continue;
+                // 检查是否禁用（class 包含 "disabled" 或 "cf" 哈希）
                 const cls = (cell.className || '').trim();
-                if (cls.includes('dKqGwkfJcf')) continue;  // 跳过 disabled
-                if (cell.getAttribute('title') === '{target_iso}') {{
+                if (cls.toLowerCase().includes('disabled')) continue;
+                // 标准化 title 比较
+                if (title === '{target_iso}') {{
                     cell.click();
-                    return {{ success: true, method: 'cell-click', title: '{target_iso}', className: cls }};
+                    return {{ success: true, method: 'title-click', title: title, className: cls }};
                 }}
             }}
 
-            // 诊断：列出所有 cell
-            const sample = Array.from(cells).slice(0, 5).map(c => ({{
-                text: (c.textContent || '').trim(),
-                title: c.getAttribute('title') || ''
-            }}));
-            return {{ success: false, reason: 'day-not-found', targetDay: {day}, targetTitle: '{target_iso}', total: cells.length, sample }};
+            // 诊断：列出所有带 title 的 cell
+            const sample = Array.from(cells)
+                .filter(c => /^\\d{{4}}-\\d{{1,2}}-\\d{{1,2}}$/.test(c.getAttribute('title') || ''))
+                .slice(0, 10)
+                .map(c => ({{
+                    text: (c.textContent || '').trim(),
+                    title: c.getAttribute('title') || '',
+                    className: (c.className || '').trim()
+                }}));
+            return {{ success: false, reason: 'day-not-found', targetTitle: '{target_iso}', total: cells.length, sample }};
         }}""")
 
         log(f"日期选择结果: {select_result}")

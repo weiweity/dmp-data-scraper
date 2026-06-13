@@ -89,6 +89,21 @@ scraping:
   min_valid_total_override:
     "621639424901": 5000   # 白膜，浅种草为0，总量约9万，但有时更低
 
+  # ============ 日期策略 (2026-06-13 新增, ERR-20260613-002) ============
+  date_strategy:
+    # 触发器 selector 策略（基于 2026-06-13 真实 DOM 逆向）
+    trigger_selector: "span.mx-trigger-label"            # P0: 语义 class 稳定
+    trigger_selector_fallback: "[id^='trigger_mx_'] span"  # P1: ID 前缀兜底
+    # 日历弹窗 selector
+    popup_selector: "[id^='days_mx_output_']"             # 主选: 真实 ID 前缀
+    popup_selector_fallback: ".mx-output-bottom.mx-output-open"  # 兜底: class
+    # T-1 早退：target_date == T-1 时跳过 datepicker（SPA 默认就是 T-1）
+    skip_datepicker_for_t_minus_1: true
+    # 3 天连续上限：默认只跑距今 2 天内的任务（今天 + 昨天）
+    max_backfill_days: 2
+    # 人工历史回填：设 BACKFILL_DAYS=90 关闭此守卫
+    backfill_env: "BACKFILL_DAYS"
+
 # ============ Benchmark数据过滤（2026-05-20 配置化）============
 benchmark_filter:
   # 全局默认阈值：资产总量低于此值视为benchmark数据被过滤
