@@ -66,24 +66,40 @@ def test_find_trigger_uses_stable_class():
 
 
 def test_find_trigger_no_longer_uses_broken_class():
-    """_find_date_trigger_multi 不用 'mxgc-calendar-datepicker' 作 locator (docstring 注释可提)"""
+    """_find_date_trigger_multi 不用 'mxgc-calendar-datepicker' 单作 locator (但作为父类上下文是允许的)"""
     import inspect
     import re
 
     from core.dmp_item_insight_scraper import _find_date_trigger_multi
     source = inspect.getsource(_find_date_trigger_multi)
-    # 只检查 locator 字符串 (出现在 'locator': ... 后面), 忽略 docstring 历史说明
+    # 旧错误: ".mxgc-calendar-datepicker .mx-trigger" (直接 .mx-trigger 找不对元素)
+    # 新允许: ".mxgc-calendar-datepicker span.mx-trigger-label" (父 class 是 calendar, 内层是 trigger label)
+    # 检查不能是直接以 .mxgc-calendar-datepicker 结尾的 locator
     locator_uses = re.findall(r"'locator':\s*[^,]+", source)
     for line in locator_uses:
-        assert ".mxgc-calendar-datepicker" not in line, (
-            f"Broken selector '.mxgc-calendar-datepicker' must not be a locator, found: {line}"
-        )
+        # 单独的 ".mxgc-calendar-datepicker" locator (不带 span 子) 是错的
+        # ".mxgc-calendar-datepicker span..." 是允许的 (v0.1.12 trigger 选错修正兼容)
+        if "'.mxgc-calendar-datepicker'" in line and 'span' not in line:
+            raise AssertionError(
+                f"Lonely '.mxgc-calendar-datepicker' locator not allowed, found: {line}"
+            )
+    # 旧错误: 完整 class hash 'dKqGwkfJcd' 不应再出现
+    assert "dKqGwkfJcd" not in source, (
+        "Old class hash 'dKqGwkfJcd' must be removed"
+    )
+    # 旧错误策略名
     assert "exact-mxgc-trigger" not in source, (
         "Old strategy name 'exact-mxgc-trigger' must be removed"
     )
     assert "class-fuzzy-calendar-trigger" not in source, (
         "Old strategy name 'class-fuzzy-calendar-trigger' must be removed"
     )
+    # 2026-06-13 新增: 排除过滤下拉的 EXCLUDE_TEXTS 必须存在
+    assert "EXCLUDE_TEXTS" in source, (
+        "EXCLUDE_TEXTS 列表必须存在 (2026-06-13 trigger 选错修正: 过滤'同行同层'/'资产总体'等)"
+    )
+    assert "同行同层" in source, "EXCLUDE_TEXTS must include '同行同层'"
+    assert "资产总体" in source, "EXCLUDE_TEXTS must include '资产总体'"
 
 
 # ===== try_select_date_v2 用 ID 前缀 selector (1 测试) =====
