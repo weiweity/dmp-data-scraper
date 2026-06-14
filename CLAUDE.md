@@ -263,4 +263,43 @@ codegraph 标 "⚠️ no covering tests found":
 
 ---
 
+## 10. 严禁 ad-hoc 数据分析脚本 (2026-06-14, ERR-20260613-004)
+
+> 任何"数据状态"声明 (latest/missing/count/range) **必须**用 `core.utils.csv_state` 工具. 禁止 ad-hoc `python3 -c "sorted(dates.keys())"` 之类.
+
+### 工具用法
+
+```bash
+# 总体状态
+python3 -m core.utils.csv_state core/data3.csv
+
+# 范围缺失检测
+python3 -m core.utils.csv_state core/data3.csv 2026-05-01 2026-06-14
+```
+
+### Python API
+
+```python
+from core.utils.csv_state import get_state, get_missing_dates_in_range, print_state
+from datetime import date
+
+state = get_state('core/data3.csv')
+print(f"Earliest: {state.earliest_date}, Latest: {state.latest_date}")
+
+missing = get_missing_dates_in_range('core/data3.csv', date(2026, 5, 1), date(2026, 6, 14))
+print(f"Missing: {[d.isoformat() for d in missing]}")
+```
+
+### 为何禁止 ad-hoc
+- `sorted(dates.keys())` 对 YYYY/M/D 字符串会字典序错乱 (e.g., '2026/5/9' > '2026/5/10')
+- 我 (Claude) 反复犯此错, 6/13 误报 "Latest=5/9" → 心智模型残留 → 6/14 又说"5/10-5/31 缺" (实际早就有)
+- csv_state.py 内部**强制** `parse_date` → `dt.date()` 再 min/max, 工具级杜绝
+
+### 何时需要新分析
+如果 csv_state.py 不能直接回答你的问题 (e.g., "每个商品 X 维度的均值"), 在 csv_state.py 加新函数 + 加测试, 不要在 ad-hoc 脚本里写.
+
+详见 `.learnings/ERRORS.md` ERR-20260613-004.
+
+---
+
 *此文件由 AI 维护, 最后更新 2026-06-13 (scraper 项目彻底独立, 删 9 章节, 11→9 节)*
