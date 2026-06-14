@@ -174,7 +174,7 @@ v0.1.17 清理 `dmp_common.py` 死代码时, `from core.utils.dates import parse
 |---|---|---|
 | v0.1.0 | 项目拆出独立 repo, 22 模块 | Sprint 16 Wave 1 |
 | v0.1.16 | P0 + P1 技术债清理, P2 跳过 | CLAUDE.md §11 |
-| v0.1.17 | WIP 收口, 19 个 P1 测试 | test_sanity_check 等 (103/103) |
+| v0.1.17 | WIP 收口, 19 个 P1 测试 | test_sanity_check 等 (103/103) → v0.1.20 补 5 个 (108/108) |
 | v0.1.18 | run.sh 实时监控 + 进度快照 | HOW-TO-FIX §0 |
 | v0.1.19 | 恢复 parse_number re-export | LESSONS §Fix 1 |
 | v0.1.20 | T-1 Date Sanity 格式修复 | LESSONS §Fix 2 |
