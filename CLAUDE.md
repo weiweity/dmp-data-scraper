@@ -68,7 +68,7 @@ codegraph callers . read_account                  # 反向追踪
 | 版本 | **v0.1.23** (2026-06-14) |
 | pytest | **108/108 passed** (v0.1.17 后 +19) |
 | 跑批业务 | data3.csv ~7200 行 (单品洞察, 每日) |
-| 索引统计 | 32 files / 486 nodes / 1367 edges (1.45 MB) |
+| 索引统计 | 40 files / 566 nodes / 1573 edges (1.70 MB) |
 
 > ⚠️ **本项目自包含**: 跟其他项目无 import / 调度 / 配置依赖。
 
