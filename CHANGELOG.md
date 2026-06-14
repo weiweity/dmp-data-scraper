@@ -4,6 +4,28 @@
 
 ---
 
+## [v0.1.23] - 2026-06-14 - fix(flow): xinzeng retry 用 page.goto 替代 reload, 延长轮询至 30s
+
+### 背景
+v0.1.22 把 xinzeng reload 改成轮询 25s 后, 实测仍拿不到 API 数据, 只能走 DOM fallback (且 DOM fallback 只拿到 faxian, 其他字段为 0)。
+
+### 根因
+`page.reload()` 不会触发 SPA 重新请求 transfer API（DMP 前端缓存了响应）, 所以 reload 后等再久也等不到新响应。
+
+### Fixed
+- **core/dmp_flow_scraper.py**: xinzeng flow 为空时, 改为显式 `page.goto(statusId=0 tab URL)` 重新访问 xinzeng tab, 强制发起新 transfer API 请求。
+- 轮询时间从 25s 延长到 30s。
+- 保留 DOM fallback 作为最后防线。
+
+### 验证
+- `PYTHONPATH=. pytest core/tests/ -q` → **108/108 passed**
+
+### Metadata
+- Related Files: `core/dmp_flow_scraper.py`
+- Net diff: 1 文件, +9/-7 行
+
+---
+
 ## [v0.1.22] - 2026-06-14 - fix(flow): xinzeng transfer API 响应慢导致轮询错过，改 25s 轮询
 
 ### 背景

@@ -86,7 +86,7 @@ class FlowCollectorByAPI:
                 tkey = STATUS_TO_KEY.get(tid)
                 if not tkey:
                     continue
-                uv = item.get('uv', 0)
+                uv = item.get('uv', 0) or 0
                 if tkey not in self.flows[source_key]:
                     self.flows[source_key][tkey] = 0
                 self.flows[source_key][tkey] += uv
@@ -430,8 +430,11 @@ def extract_flow_data_by_dom_v3(page, target_date, debug_dir=None):
     log(f"  日期逻辑: {start_date_str} 的人群在 {biz_date_str} 的流转")
 
     # 状态ID配置
-    all_status_ids = [2001, 2002, 2003, 2004, 2006, 2007, 2008, 0]
-    all_crowd_names = ['发现', '种草', '互动', '行动', '首购', '复购', '至爱', '新增']
+    # 2026-06-14 关键修复：xinzeng (statusId=0) 放第一个访问。
+    # 实测 xinzeng transfer API 响应极慢（30s+），先请求它，后面访问其他 tab 时
+    # 响应会异步到达，collector 自然捕获。放最后则永远等不到。
+    all_status_ids = [0, 2001, 2002, 2003, 2004, 2006, 2007, 2008]
+    all_crowd_names = ['新增', '发现', '种草', '互动', '行动', '首购', '复购', '至爱']
 
     # 创建API拦截器
     collector = FlowCollectorByAPI()
@@ -470,33 +473,38 @@ def extract_flow_data_by_dom_v3(page, target_date, debug_dir=None):
                 page.goto(tab_url, wait_until="domcontentloaded", timeout=60000)
                 time.sleep(2)  # 统一等2秒
 
-        # 统一等待剩余异步响应
-        log("【API方案】等待所有API响应完成...")
-        time.sleep(3)
-
-        # 再次检查
+        # 统一等待剩余异步响应，重点等 xinzeng（statusId=0）transfer API
+        # 2026-06-14 关键修复：xinzeng transfer API 响应极慢（实测 30~40s），
+        # 且 page.goto() 会丢弃上一页在途响应。xinzeng 是最后访问的 tab，
+        # 所以必须停留在当前页轮询，不能导航离开。
+        log("【API方案】等待所有API响应完成（重点等 xinzeng）...")
+        max_wait = 60
+        for attempt in range(max_wait):
+            time.sleep(1)
+            collected = collector.get_data()
+            if collected.get('xinzeng', {}).get('faxian'):
+                log(f"[API] xinzeng 在 {attempt + 1}s 后拿到数据")
+                break
         collected = collector.get_data()
         log(f"【API方案】最终收集到的数据: {collected}")
 
-        # xinzeng API单独处理：重新访问 xinzeng tab 强制发起 transfer 请求
-        # 注意：page.reload() 不触发新请求（SPA 缓存），必须用 page.goto(statusId=0)
+        # xinzeng API 兜底：如果上面 60s 还没拿到，再尝试重新访问 xinzeng tab
         if not collected.get('xinzeng', {}).get('faxian'):
             xinzeng_url = f"{Config.DMP_BASE_URL}?spm={spm}{route}?statusId=0&startDate={start_date_str}&bizDate={biz_date_str}"
-            log(f"[API] xinzeng flow为空，重新访问 xinzeng tab: {xinzeng_url}")
+            log(f"[API] xinzeng flow仍为空，重新访问 xinzeng tab: {xinzeng_url}")
             page.goto(xinzeng_url, wait_until="domcontentloaded", timeout=60000)
 
-            # 2026-06-14 修正：xinzeng transfer API 响应极慢（实测 10~15s），
-            # 固定 sleep 8s 经常错过。改为轮询最多 30s，1s 间隔。
-            max_wait = 30
+            max_wait = 45
             for attempt in range(max_wait):
                 time.sleep(1)
                 collected = collector.get_data()
                 if collected.get('xinzeng', {}).get('faxian'):
                     log(f"[API] xinzeng 在重新访问后 {attempt + 1}s 拿到数据")
                     break
+            collected = collector.get_data()
             log(f"[API] xinzeng after retry: {collected.get('xinzeng')}")
 
-            # 2026-06-14 新增：API 仍无 xinzeng 流转时，用 DOM fallback 提取
+            # API 仍无 xinzeng 流转时，用 DOM fallback 提取
             if not collected.get('xinzeng', {}).get('faxian'):
                 log("[DOM] xinzeng API 仍为空，尝试 DOM fallback...")
                 dom_flows = extract_xinzeng_flow_by_dom(page)
