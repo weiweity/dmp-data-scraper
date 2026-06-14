@@ -296,6 +296,63 @@ sorted(dates)  # ['2026/5/1', '2026/5/10', '2026/5/11', ...'2026/5/19', '2026/5/
 
 ---
 
+## [ERR-20260613-004] ad-hoc 分析脚本反复用字符串 sorted(dates.keys()) → 心智模型残留 → 反复误判 5/10-5/31 缺数据
+
+**Logged**: 2026-06-14T02:00:00Z
+**Priority**: high
+**Status**: resolved (v0.1.15 csv_state.py 工具强制 date 对象)
+**Area**: thinking-pattern / analysis-tools
+
+### Summary
+6/13 跑批前我用 `python3 -c "..."` 跑了 ad-hoc 分析, 用 `sorted(dates.keys())` 看 Latest, 因为 YYYY/M/D 格式被字符串排序, 误报 "Latest: 5/9". v0.1.10 修复 format_date_for_csv 后, 早期 "5/9 是最新" 的心智模型**没更新**, 我继续按 "5/10-5/31 缺" 推断. 6/14 跑完 Round 1-3 后, 我又说 "5/10-5/31 用户手动决定要不要补"——但实际 5/10-5/31 **早就有** 15 行, 完整覆盖.
+
+### Root Cause (思维模式 bug, 不是代码 bug)
+1. **生产代码 3 个 `get_missing_dates_*` 函数全部正确**: `existing_dates` 是 date 对象 (parse_date 后), min/max 不会错乱
+2. **bug 只在 ad-hoc 脚本**: 我每次写 `python3 -c "..."` 都用 `sorted(dates.keys())` / `max(dates.keys())` on strings → 字典序 ≠ 时序
+3. **心智模型残留**: 第一次误判后, 后续我不重跑验证, 直接复用错误结论. 即使 format 已修, "5/9 是最新" 的印象留在脑子里
+4. **5/10-5/31 实际有 15 行**: 早期会话跑批就抓了, 我新跑的 6/1-6/12 是"补 6 月缺口", 不是"覆盖 5/10-5/31"
+
+### Symptom
+- 6/14 我说"5/10-5/31: 用户手动决定要不要补"——错的, 已有
+- 用户反复纠错: "你直接开始跑" 之后又说"为啥你每次都能识别出这个情况"
+- **每次我说"X 日期缺"都是错的**, 因为我用的是陈旧心智模型
+
+### Fix (v0.1.15)
+**根除**: 建 `core/utils/csv_state.py` 单一 source of truth 工具:
+- `get_state(csv_file)` → CSVState dataclass (latest/earliest 都是 date 对象)
+- `get_missing_dates_in_range(csv_file, start, end)` → 缺失日期 list
+- `print_state(csv_file)` → 人类可读
+- 内部**强制** `parse_date` → `dt.date()` 再 min/max
+- CLI: `python3 -m core.utils.csv_state <csv> [start] [end]`
+
+**禁止规则 (写到 CLAUDE.md)**:
+> 任何 "数据状态" 声明 (latest/missing/count) **必须** 用 `core.utils.csv_state` 工具. 禁止 ad-hoc `python3 -c "sorted(dates.keys())"` 这类脚本. 违反则该声明作废.
+
+### Tests Added (6 个)
+- `test_get_state_min_max_uses_date_objects_not_strings` — 核心: 5/9 < 5/10 (date 对象, 正确)
+- `test_get_state_handles_mixed_formats` — 兼容 YYYY/M/D + YYYY/MM/DD 混合
+- `test_get_state_mixed_format_lexical_sort_trap` — **直接对抗** 我之前错误心智模型 (断言: 字符串 max='2026/5/9' 错的, csv_state max='2026/5/31' 对)
+- `test_get_missing_dates_in_range` — 范围检测
+- `test_get_state_for_real_csv_data3` — 集成测试, 验证 data3.csv latest='2026/06/12'
+- `test_print_state_does_not_crash` — CLI 烟雾
+
+### Verified
+- `pytest core/tests/` → 103/103 passed (97 + 6 新)
+- `python3 -m core.utils.csv_state core/data3.csv` → 准确: latest=2026-06-12
+- `python3 -m core.utils.csv_state core/data3.csv 2026-05-01 2026-06-14` → 范围缺失仅 6/13, 6/14 (T+1 未出, 正常)
+
+### Lesson
+1. **不要写 ad-hoc 分析脚本**: 一次性的 `python3 -c "..."` 是 bug 温床. 用持久化的 utility function
+2. **心智模型必须随事实更新**: 第一次发现 "Latest=5/9" 是错的, 修了 format 之后**必须重跑**确认 "Latest=5/31". 我没重跑 = 没更新模型 = 错误传播
+3. **工具有 force function**: csv_state.py 用 date 对象强制. 不依赖用户"记得用 parse_date". 工具把规则编码进去
+4. **测试要直接对抗过去错误**: `test_get_state_mixed_format_lexical_sort_trap` 是"防止再犯"的回归测试. 描述里有"验证字符串 max 错乱 (这是 bug 来源)", 让后人知道为什么这个测试存在
+
+### Metadata
+- Related Files: core/utils/csv_state.py (新), core/tests/test_csv_state.py (新)
+- Tests: 103 total (97 + 6 new)
+
+---
+
 ## [ERR-20260403-002] 资产诊断数据全同值（弹窗干扰+距离算法）
 
 **Logged**: 2026-04-03T18:30:00Z

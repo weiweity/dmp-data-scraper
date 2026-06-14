@@ -4,6 +4,41 @@
 
 ---
 
+## [v0.1.15] - 2026-06-14 - fix(tooling): csv_state.py 工具 + 严禁 ad-hoc 数据分析 (ERR-20260613-004 根治)
+
+### 背景
+6/13 跑批前我用 `python3 -c "...sorted(dates.keys())..."` 误报 "Latest=5/9" (YYYY/M/D 字典序 ≠ 时序). 6/14 跑完 Round 1-3 后, 我又基于陈旧心智模型说"5/10-5/31 缺数据"——实际早就有 15 行. **反复犯同一种错误**, 因为我每次写 ad-hoc 脚本都用字符串排序. 6/14 用户拍板"杜绝它".
+
+### Added
+- **core/utils/csv_state.py** (新, ~150 行): 单一 source of truth 工具
+  - `get_state(csv_file)` → CSVState dataclass (earliest/latest 都是 date 对象)
+  - `get_missing_dates_in_range(csv_file, start, end)` → 缺失日期 list
+  - `print_state(csv_file, ...)` → 人类可读
+  - CLI: `python3 -m core.utils.csv_state <csv> [start] [end]`
+  - 内部**强制** parse_date → date 对象再 min/max, 工具级杜绝字符串排序
+- **core/tests/test_csv_state.py** (新, 6 测试): 直接对抗过去错误
+  - `test_get_state_mixed_format_lexical_sort_trap`: **回归测试**, 注释里写"这是 bug 来源"
+
+### Changed
+- **CLAUDE.md §10** (新): "严禁 ad-hoc 数据分析脚本" 规则. 任何"数据状态"声明必须用 csv_state.py 工具. 违反则声明作废.
+
+### 验证
+- `pytest core/tests/` → 103/103 passed (97 + 6 新)
+- `python3 -m core.utils.csv_state core/data3.csv` → 准确: latest=2026-06-12
+- `python3 -m core.utils.csv_state core/data3.csv 2026-05-01 2026-06-14` → 范围缺失仅 6/13, 6/14 (T+1 未出, 正常)
+
+### Lesson
+1. **ad-hoc 脚本是 bug 温床**: 一次性 `python3 -c "..."` 不持久, 不测试, 错也察觉不到
+2. **心智模型必须随事实更新**: 第一次发现 "Latest=5/9" 错, 修了 format 后**必须重跑**确认. 我没重跑 = 错误传播
+3. **工具级 force function**: 不依赖用户"记得用 parse_date". csv_state.py 把规则编码进工具
+4. **测试要直接对抗过去错误**: 回归测试注释里写"这是 bug 来源", 让后人理解为什么这个测试存在
+
+### Metadata
+- Related Files: core/utils/csv_state.py (新), core/tests/test_csv_state.py (新), CLAUDE.md §10 (新)
+- Tests: 103 total (97 + 6 new)
+
+---
+
 ## [v0.1.14] - 2026-06-14 - fix(scraper): data['date'] 改用 format_date_for_csv (统一日期格式)
 
 ### 背景
