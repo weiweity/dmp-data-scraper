@@ -255,12 +255,9 @@ wc -l core/data3.csv                       # 应 ≥ 7000 行
 | 项目说明 | `README.md` | 项目概述 + 快速开始 |
 | 变更日志 | `CHANGELOG.md` | v0.1.x 版本历史 |
 | SPA 拦截方法论 | `KB-数据采集-SPA接口拦截.md` | Network 拦截核心知识 |
-| launchd 调度 | `core/README-dmp-scraper-launchd.md` | 调度文档 (T+1 跨日保护) |
 | 经验日志 | `.learnings/LEARNINGS.md` | 技术发现 + 最佳实践 |
 | 错误日志 | `.learnings/ERRORS.md` | 已知错误 + 修复 |
-| 功能需求 | `.learnings/FEATURE_REQUESTS.md` | 待实现功能 |
 | 工作流指南 | `workflows/README.md` | 6 个 JS workflow 使用 |
-| 项目记忆 | `.claude/memory/project-fuqing-scraper.md` | 当前状态速查 |
 
 ---
 
