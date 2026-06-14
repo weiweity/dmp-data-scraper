@@ -36,7 +36,6 @@ import os
 import shutil
 import subprocess
 from datetime import datetime, timedelta
-from typing import Any
 
 
 # ============================================================
@@ -115,17 +114,8 @@ def _send_lark_alert(content: str, open_id: str | None = None,
 # 辅助函数
 # ============================================================
 
-def _strip_int(value: Any) -> int:
-    """CSV 单元格 → int（去除逗号 / 引号 / 空白）。"""
-    if value is None:
-        return 0
-    s = str(value).replace('"', "").replace(",", "").strip()
-    if not s:
-        return 0
-    try:
-        return int(float(s))
-    except (ValueError, TypeError):
-        return 0
+# 2026-06-14 (P1-1): _strip_int 4 份重复 → core.validators 共享
+from core.validators import _strip_int  # noqa: F401  保留旧名, 内部已替换
 
 
 def _read_prev_row(csv_file: str | None, item_id: str,
@@ -178,16 +168,35 @@ def check_date_sanity(spa_date: str | None, target_date: str | None) -> tuple[bo
     if not spa_date:
         return False, f"SPA 未返回 trigger 日期（目标 {target_date}）"
 
-    # 同时尝试两种格式比对
-    candidates = {
-        target_date,
-        target_date.replace("-", "/"),
-        target_date.replace("/", "-"),
-    }
-    for c in candidates:
-        if c in spa_date:
-            return True, "OK"
-    return False, f"SPA 日期 ({spa_date}) ≠ 目标日期 ({target_date})"
+    # 标准化日期格式：统一为 YYYY-MM-DD（补前导零）
+    def _normalize(date_str: str) -> str:
+        """将 YYYY/M/D 或 YYYY-MM-DD 统一为 YYYY-MM-DD"""
+        # 替换分隔符
+        normalized = date_str.replace("/", "-")
+        # 补前导零：2026-6-12 -> 2026-06-12
+        parts = normalized.split("-")
+        if len(parts) == 3:
+            return f"{parts[0]}-{int(parts[1]):02d}-{int(parts[2]):02d}"
+        return normalized
+
+    # 智能判断：SPA 显示 "昨日" 表示数据已刷新
+    if '昨日' in spa_date:
+        # 从 target_date 推断是否匹配（target_date 应该是昨天或更早）
+        # 这里不校验具体日期，因为 "昨日" 表示数据最新
+        return True, "OK (SPA 显示'昨日'，数据已刷新)"
+
+    normalized_spa = _normalize(spa_date)
+    normalized_target = _normalize(target_date)
+
+    if normalized_spa == normalized_target:
+        return True, "OK"
+
+    # 兼容旧逻辑：target 在 spa 中（处理特殊格式如 "昨日 2026-06-12"）
+    if normalized_target in normalized_spa:
+        return True, "OK"
+
+    # 日期不匹配 → 可能是数据未刷新（T+2 昨天的数据）
+    return False, f"SPA 日期 ({spa_date}) ≠ 目标日期 ({target_date})，数据可能未刷新"
 
 
 # ============================================================

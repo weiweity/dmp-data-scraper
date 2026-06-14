@@ -24,6 +24,23 @@ Re-exports:
     flow_validators.check_date_sanity
     flow_validators.check_business_smoothness
 """
+from typing import Any
+
+# ============ 共享 helper (2026-06-14 合并: 4 份 _strip_int 重复实现) ============
+# 必须在 `from . import items_validators` 之前定义, 避免子模块反向 import __init__ 循环
+def _strip_int(value: Any) -> int:
+    """CSV 单元格 → int（去除逗号 / 引号 / 空白）。"""
+    if value is None:
+        return 0
+    s = str(value).replace('"', "").replace(",", "").strip()
+    if not s:
+        return 0
+    try:
+        return int(float(s))
+    except (ValueError, TypeError):
+        return 0
+
+
 from . import items_validators
 from . import assets_validators
 from . import flow_validators
@@ -49,6 +66,8 @@ __all__ = [
     "validate_xinzeng",
     "check_date_sanity_flow",
     "check_business_smoothness_flow",
+    # 共享 helper
+    "_strip_int",
 ]
 
 # module-level short names (re-exported from submodules)

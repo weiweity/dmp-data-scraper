@@ -658,7 +658,7 @@ def append_flow_to_csv(csv_file, date_str, flow_data):
                     all_essentially_same = False
                     break
         if all_essentially_same and latest_by_crowd:
-            log(f"⏭️ 流转 {date_str} 所有人群与上一天实质相同，判定为T+1未更新，跳过写入")
+            log(f"⚠️ 流转 {date_str} 所有人群与上一天实质相同，判定为T+1未更新，跳过写入")
             return True
 
     all_rows = existing_rows + new_rows

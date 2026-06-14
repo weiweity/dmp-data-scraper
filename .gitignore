@@ -64,6 +64,15 @@ logs/
 
 # Backup
 _backup/
+# CSV 中间产物 (修复/迁移期间的备份, 不入 git 但保留在磁盘供回退)
+data3.csv.backup
+data3.csv.before-fix
+data3.csv.cleaned
+data3.csv.pre-*
+core/data3.csv.backup
+core/data3.csv.before-fix
+core/data3.csv.cleaned
+core/data3.csv.pre-*
 
 # Archive
 _archive/

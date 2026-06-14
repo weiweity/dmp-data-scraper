@@ -17,10 +17,10 @@ statusId 映射（来自 dmp_flow_scraper.py:34-38）:
 """
 from __future__ import annotations
 
-import csv
-import os
-from datetime import datetime, timedelta
-from typing import Any
+from datetime import datetime
+
+# 2026-06-14 (P1-1): _strip_int 4 份重复 → core.validators 共享
+from core.validators import _strip_int  # noqa: F401  保留旧名, 内部已替换
 
 
 # ===========================================================================
@@ -55,18 +55,6 @@ FLOW_TRANSFORM_FIELDS = (
 # statusId=0 (xinzeng) 的特殊状态 — transfer API 不返回, 需 DOM 回退
 XINZENG_STATUS_ID = 0
 XINZENG_CROWD_KEY = "xinzeng"
-
-
-def _strip_int(value: Any) -> int:
-    if value is None:
-        return 0
-    s = str(value).replace('"', "").replace(",", "").strip()
-    if not s:
-        return 0
-    try:
-        return int(float(s))
-    except (ValueError, TypeError):
-        return 0
 
 
 # ===========================================================================

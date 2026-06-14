@@ -15,59 +15,15 @@ backward compatibility with append_tocsv, but also accept row-only when csv_file
 """
 from __future__ import annotations
 
-import csv
 import json
 import os
 import shutil
 import subprocess
-from datetime import datetime, timedelta
-from typing import Any
 
-
-# ===========================================================================
-# 辅助函数（与 sanity_check.py 对齐：_strip_int / _read_prev_row / _parse_date）
-# ===========================================================================
-
-def _strip_int(value: Any) -> int:
-    """CSV 单元格 → int（去除逗号 / 引号 / 空白）。"""
-    if value is None:
-        return 0
-    s = str(value).replace('"', "").replace(",", "").strip()
-    if not s:
-        return 0
-    try:
-        return int(float(s))
-    except (ValueError, TypeError):
-        return 0
-
-
-def _read_prev_row(csv_file: str | None, item_id: str,
-                   prev_date_str: str) -> dict | None:
-    """读 CSV 中 (item_id, prev_date_str) 对应的行（首条匹配）。"""
-    if not csv_file or not os.path.exists(csv_file):
-        return None
-    try:
-        with open(csv_file, "r", encoding="utf-8") as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                if (row.get("ID", "") == str(item_id)
-                        and row.get("时间", "") == prev_date_str):
-                    return row
-    except Exception:
-        return None
-    return None
-
-
-def _parse_date(date_str: str) -> datetime | None:
-    """解析 'YYYY/MM/DD' 或 'YYYY-MM-DD'。失败返回 None。"""
-    if not date_str:
-        return None
-    for fmt in ("%Y/%m/%d", "%Y-%m-%d"):
-        try:
-            return datetime.strptime(date_str.strip(), fmt)
-        except ValueError:
-            continue
-    return None
+# 2026-06-14 (P1-1 + P1-2): _strip_int 4 份重复 → core.validators 共享
+#                  _read_prev_row / _parse_date 在 items_validators 0 调用, 删 (走公共 parse_date)
+from core.validators import _strip_int  # noqa: F401  保留旧名, 内部已替换
+from core.utils.dates import parse_date as _parse_date  # noqa: F401  保留旧名, 内部已替换
 
 
 # ===========================================================================

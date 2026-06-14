@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 import pytest
 
-from core.config.settings import Config, CONFIG_ITEMS_YAML
+from core.config.settings import Config
 
 
 def test_config_load_items_reads_yaml(tmp_path: Path) -> None:

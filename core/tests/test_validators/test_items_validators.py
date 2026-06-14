@@ -8,7 +8,6 @@
   - _check_business_smoothness(row, prev_row, threshold=0.30) -> str | None
   - send_lark_alert(message, open_id=None) -> (bool, str)
 """
-import pytest
 
 from core.validators.items_validators import (
     _check_api_health,
