@@ -4,6 +4,48 @@
 
 ---
 
+## [v0.1.17] - 2026-06-14 - test(refactor): WIP 收口 — dmp_common 死代码清理 + 3 个 P1 测试覆盖补齐
+
+### 背景
+v0.1.16 清理时跳过了 `dmp_common.py` 的 read_account 死代码 (误判"已是 re-export"). 后用户拍板"一起收口". 同时合并 3 个前置会话未提交的 P1 测试文件, 补 CLAUDE.md §9 P1 标记的"0 测试覆盖"缺口.
+
+### Fixed
+- **core/dmp_common.py** (-95 行, 净增 0):
+  - 删 `read_account` 函数体 (40+ 行死代码, CLAUDE.md P1 记录)
+  - 删 `from core.utils.dates import parse_number` unused import
+  - 删 `from core.utils.t_offset import get_target_date` unused import
+  - 删 4 个 `"""账号读取"""` 等历史注释块
+  - 行为不变 (re-export 已 working, 函数体从未被调用)
+
+### Added
+- **core/tests/test_anti_detect.py** (3 tests): 测 `anti_detect.apply_anti_detect` (CLAUDE.md §9 P1 标"0 测试")
+  - happy path / extra_headers / cdp_failure
+- **core/tests/test_check_dmp_session.py** (8 tests): 测 `dmp_common.check_dmp_session` 重试改造 (Sprint 19+)
+  - isLogin true/false / 3 次重试边界 / 登录按钮检测 / title 含"登录" / 自定义 max_retries
+- **core/tests/test_sanity_check.py** (8 tests): 测 `sanity_check.check_item_data_validity` (CLAUDE.md §9 P1 标"0 测试")
+  - happy / None / 空 dict / zero_total / subfield 超出 total / 负数
+
+### Changed
+- 测试总数: 84 → 103 (+19) (3 个新文件 8+3+8)
+- **CLAUDE.md §9**: P1 标记 `check_dmp_session` / `apply_anti_detect` / `check_item_data_validity` 三个 0 测试函数已补测试 (v0.1.17), 死代码 read_account 已删 (v0.1.17)
+
+### 验证
+- `pytest core/tests/ -q` → **103/103 passed** (无回归, 19 个新测试全过)
+- `pytest core/tests/test_anti_detect.py core/tests/test_check_dmp_session.py core/tests/test_sanity_check.py -v` → 19/19 passed (新测试单独跑)
+- `git grep "apply_anti_detect\|check_dmp_session\|check_item_data_validity" core/` → 全部已覆盖
+
+### Lesson
+- **CLAUDE.md P1 记录要分清"已修"和"未修"**: v0.1.15 之后我以为 dmp_common 死代码已修, 实际是其他会话的 WIP. CLAUDE.md §9 需要明确标记"v0.1.17 关闭"的 3 个 P1 项.
+- **测试文件就算 untracked 也算进度**: pytest collect 不分 tracked/untracked, 103 这个数字其实一直包含 19 个新测试, 只是 git 上从未 commit. 跑测试报告时易误判.
+- **3 untracked test 文件 + 1 modified production file 一起 commit 是合理的"收口"**: 单一逻辑单元 (P1 测试覆盖补齐), 不混 v0.1.16 的 P0+P1 cleanup 主题.
+
+### Metadata
+- Related Files: core/dmp_common.py, core/tests/{test_anti_detect,test_check_dmp_session,test_sanity_check}.py
+- Tests: 84 → 103 (+19)
+- Net diff: 4 files, +373/-95
+
+---
+
 ## [v0.1.16] - 2026-06-14 - chore(refactor): 技术债清理 (按"代码合理, 不懂不要装懂"原则)
 
 ### 背景

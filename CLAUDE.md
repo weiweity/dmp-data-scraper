@@ -258,8 +258,9 @@ Workflow({scriptPath: "workflows/dmp-optimization.js"})   # 优化执行
 
 ### 🟡 P1: 关键函数 0 测试覆盖
 codegraph 标 "⚠️ no covering tests found":
-- `check_item_data_validity` (sanity_check.py:195) — 1 caller, **0 tests**
-- `apply_anti_detect` (anti_detect.py:537) — 1 caller, **0 tests**
+- ~~`check_item_data_validity` (sanity_check.py:195) — 1 caller, **0 tests**~~ ✅ v0.1.17 关闭 (test_sanity_check.py 8 tests)
+- ~~`apply_anti_detect` (anti_detect.py:537) — 1 caller, **0 tests**~~ ✅ v0.1.17 关闭 (test_anti_detect.py 3 tests)
+- ~~`check_dmp_session` (dmp_common.py:374)~~ ✅ v0.1.17 关闭 (test_check_dmp_session.py 8 tests)
 
 ---
 
