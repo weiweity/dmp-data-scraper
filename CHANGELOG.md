@@ -4,6 +4,38 @@
 
 ---
 
+## [v0.1.20] - 2026-06-14 - fix(items): 修复 T-1 跑批 Date Sanity Check 格式不匹配导致 0/15
+
+### 背景
+v0.1.18 全量跑批时, 单品洞察 15 个商品全部失败。日志显示 Date Sanity Check 反复报错:
+> `⚠️ 严重：target_date=2026-06-13，但 SPA 显示'昨日'(2026/06/13)，URL 日期参数未生效。拒绝写入`
+
+根因是 `date_str` 为 URL 格式 `YYYY-MM-DD`, 而 `yesterday_str` 用 `format_date_for_csv` 生成 `YYYY/MM/DD`, 字符串比较永远不等, 误杀了所有 T-1 正确数据。
+
+### Fixed
+- **core/dmp_item_insight_scraper.py**:
+  - 抽取 `_check_spa_date_match(date_str, spa_date_text, today_date)` 纯函数, 统一用 `YYYY-MM-DD` 内部比较, 比较通过后再返回 `YYYY/MM/DD` 用于显示。
+  - T-1 + SPA "昨日" 现在正确匹配。
+  - SPA 具体日期与 URL 目标比较时也统一格式, 避免 `2026/6/13` vs `2026-06-13` 误杀。
+
+### Added
+- **core/tests/test_spa_date_match.py** (5 tests):
+  - T-1 + "昨日" → 匹配
+  - T-2 + "昨日" → 不匹配
+  - 具体日期一致 → 匹配
+  - 具体日期不一致 → 不匹配
+  - 无法识别文本 → 不匹配
+
+### 验证
+- `PYTHONPATH=. pytest core/tests/test_spa_date_match.py -v` → **5/5 passed**
+- `PYTHONPATH=. pytest core/tests/ -q` → **108/108 passed**
+
+### Metadata
+- Related Files: `core/dmp_item_insight_scraper.py`, `core/tests/test_spa_date_match.py`
+- Net diff: 2 文件, ~+80/-40 行
+
+---
+
 ## [v0.1.19] - 2026-06-14 - fix(cli): 修复 v0.1.17 误删 parse_number re-export 导致跑批入口崩溃
 
 ### 背景
