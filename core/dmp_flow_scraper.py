@@ -478,21 +478,23 @@ def extract_flow_data_by_dom_v3(page, target_date, debug_dir=None):
         collected = collector.get_data()
         log(f"【API方案】最终收集到的数据: {collected}")
 
-        # xinzeng API单独处理：reload页面强制重新发起transfer请求
+        # xinzeng API单独处理：重新访问 xinzeng tab 强制发起 transfer 请求
+        # 注意：page.reload() 不触发新请求（SPA 缓存），必须用 page.goto(statusId=0)
         if not collected.get('xinzeng', {}).get('faxian'):
-            log("[API] xinzeng flow为空，强制reload页面...")
-            page.reload(wait_until="domcontentloaded", timeout=60000)
+            xinzeng_url = f"{Config.DMP_BASE_URL}?spm={spm}{route}?statusId=0&startDate={start_date_str}&bizDate={biz_date_str}"
+            log(f"[API] xinzeng flow为空，重新访问 xinzeng tab: {xinzeng_url}")
+            page.goto(xinzeng_url, wait_until="domcontentloaded", timeout=60000)
 
             # 2026-06-14 修正：xinzeng transfer API 响应极慢（实测 10~15s），
-            # 固定 sleep 8s 经常错过。改为轮询最多 25s，1s 间隔。
-            max_wait = 25
+            # 固定 sleep 8s 经常错过。改为轮询最多 30s，1s 间隔。
+            max_wait = 30
             for attempt in range(max_wait):
                 time.sleep(1)
                 collected = collector.get_data()
                 if collected.get('xinzeng', {}).get('faxian'):
-                    log(f"[API] xinzeng 在 reload 后 {attempt + 1}s 拿到数据")
+                    log(f"[API] xinzeng 在重新访问后 {attempt + 1}s 拿到数据")
                     break
-            log(f"[API] xinzeng after reload: {collected.get('xinzeng')}")
+            log(f"[API] xinzeng after retry: {collected.get('xinzeng')}")
 
             # 2026-06-14 新增：API 仍无 xinzeng 流转时，用 DOM fallback 提取
             if not collected.get('xinzeng', {}).get('faxian'):
