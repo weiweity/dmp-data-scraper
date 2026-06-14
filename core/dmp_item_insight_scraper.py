@@ -346,6 +346,35 @@ def _get_prev_day_total(item_id, prev_date_str, data_file):
 
 # ============ 登录（兼容模式） ============
 # ============ 单品数据抓取 ============
+
+def _check_spa_date_match(date_str: str, spa_date_text: str,
+                          today_date: datetime.date | None = None) -> tuple[bool, str | None, str | None]:
+    """判断 SPA trigger 日期文本是否与目标日期匹配（Date Sanity Check 子逻辑）。
+
+    返回: (matches, actual_date_for_display, refresh_status)
+    """
+    if today_date is None:
+        today_date = datetime.now().date()
+
+    yesterday_str = (today_date - timedelta(days=1)).strftime('%Y-%m-%d')
+
+    if '昨日' in spa_date_text:
+        actual = format_date_for_csv(today_date - timedelta(days=1))
+        if date_str == yesterday_str:
+            return True, actual, 'refreshed'
+        return False, actual, 'refreshed'
+
+    date_match = re.search(r'(\d{4})-(\d{1,2})-(\d{1,2})', spa_date_text)
+    if date_match:
+        spa_parsed = f"{date_match.group(1)}-{int(date_match.group(2)):02d}-{int(date_match.group(3)):02d}"
+        actual = spa_parsed.replace('-', '/')
+        if spa_parsed == date_str:
+            return True, actual, 'matched'
+        return False, actual, 'pending'
+
+    return False, None, None
+
+
 def fetch_item_data(page, item_id, target_date, fallback_date):
     """抓取单个商品的数据 - 修复版：确保选择正确的日期
     
@@ -694,42 +723,20 @@ def fetch_item_data(page, item_id, target_date, fallback_date):
                         # 智能判断实际数据日期
                         # 场景 1: SPA 显示 "昨日" → 数据已刷新，实际日期 = T-1（昨天）
                         # 场景 2: SPA 显示具体日期（如 2026-06-11）→ 数据可能未刷新
-                        # 2026-06-14 改造（ERR-20260613-003 后续）: 改用 format_date_for_csv
-                        today = datetime.now().date()
-                        yesterday_str = format_date_for_csv(today - timedelta(days=1))
+                        matches, actual_date, refresh_status = _check_spa_date_match(
+                            date_str, spa_date_text
+                        )
+                        if actual_date:
+                            data['_actual_data_date'] = actual_date
+                        if refresh_status:
+                            data['_data_refresh_status'] = refresh_status
 
-                        if '昨日' in spa_date_text:
-                            # SPA 显示"昨日"，实际数据日期是昨天
-                            data['_actual_data_date'] = yesterday_str
-                            data['_data_refresh_status'] = 'refreshed'
-                            log(f"✅ 数据已刷新（SPA 显示'昨日'），实际数据日期: {yesterday_str}")
-
-                            # 2026-06-13 增强（ERR-20260613-002）：T-1 早退路径
-                            # 当 target_date == T-1 时，SPA 默认就是 T-1，匹配成功是正常情况
-                            if date_str == yesterday_str:
-                                log(f"✅ T-1 匹配：target_date={date_str} == SPA 昨日={yesterday_str}")
-                            else:
-                                # 关键：如果 target_date 不是昨天，说明 URL 日期参数未生效
-                                # 达摩盘回退到了最新数据，不能将其作为 target_date 的数据
-                                log(f"⚠️ 严重：target_date={date_str}，但 SPA 显示'昨日'({yesterday_str})，"
-                                    f"URL 日期参数未生效。拒绝写入，避免数据污染。")
-                                return None
+                        if matches:
+                            log(f"✅ 日期匹配: URL 目标 = SPA 实际 = {date_str}")
                         else:
-                            # 尝试解析具体日期
-                            date_match = re.search(r'(\d{4})-(\d{1,2})-(\d{1,2})', spa_date_text)
-                            if date_match:
-                                spa_parsed_date = f"{date_match.group(1)}/{int(date_match.group(2))}/{int(date_match.group(3))}"
-                                data['_actual_data_date'] = spa_parsed_date
-                                data['_data_refresh_status'] = 'pending'
-
-                                # 比较 target_date 和 SPA 实际日期
-                                if spa_parsed_date != date_str:
-                                    log(f"⚠️ 日期不匹配: URL 目标 {date_str} vs SPA 实际 {spa_parsed_date}，"
-                                        f"数据未刷新。拒绝写入，避免数据污染。")
-                                    return None
-                                else:
-                                    data['_data_refresh_status'] = 'matched'
-                                    log(f"✅ 日期匹配: URL 目标 = SPA 实际 = {date_str}")
+                            log(f"⚠️ 严重：target_date={date_str}，但 SPA 显示'{spa_date_text}'，"
+                                f"URL 日期参数未生效。拒绝写入，避免数据污染。")
+                            return None
             except Exception as e:
                 log(f"读取 SPA trigger 日期失败（不影响主流程）: {e}")
 
