@@ -4,6 +4,27 @@
 
 ---
 
+## [v0.1.19] - 2026-06-14 - fix(cli): 修复 v0.1.17 误删 parse_number re-export 导致跑批入口崩溃
+
+### 背景
+v0.1.17 清理 `dmp_common.py` 死代码时, `from core.utils.dates import parse_number` 被当作 unused import 删除, 但 `dmp_scraper.py` 仍通过 `from dmp_common import parse_number` 引用。这导致 `./START.sh` / `./run.sh -a/-f/-A` 一运行就 `ImportError`, 跑批入口完全不可用。
+
+### Fixed
+- **core/dmp_common.py**: 恢复 `parse_number` 的 re-export (`from core.utils.dates import parse_date, format_date_for_csv, normalize_date_str, parse_number`)
+- 行为与 v0.1.16 及之前一致, `dmp_scraper.py` 无需修改
+
+### 验证
+- `cd core && python3 -c "import dmp_master; print('import OK')"` → import OK
+- `PYTHONPATH=. pytest core/tests/ -q` → **103/103 passed**
+- `./run.sh -a` 不再报 `ImportError: cannot import name 'parse_number'`
+
+### Metadata
+- Related Files: `core/dmp_common.py`
+- Root Cause: v0.1.17 误删 re-export
+- Net diff: 1 文件, +1 行
+
+---
+
 ## [v0.1.18] - 2026-06-14 - feat(cli): run.sh/START.sh 支持实时监控、进度快照、环境变量透传
 
 ### 背景
