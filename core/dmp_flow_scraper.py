@@ -486,6 +486,17 @@ def extract_flow_data_by_dom_v3(page, target_date, debug_dir=None):
             collected = collector.get_data()
             log(f"[API] xinzeng after reload: {collected.get('xinzeng')}")
 
+            # 2026-06-14 新增：API 仍无 xinzeng 流转时，用 DOM fallback 提取
+            if not collected.get('xinzeng', {}).get('faxian'):
+                log("[DOM] xinzeng API 仍为空，尝试 DOM fallback...")
+                dom_flows = extract_xinzeng_flow_by_dom(page)
+                log(f"[DOM] xinzeng DOM fallback 结果: {dom_flows}")
+                if dom_flows:
+                    if 'xinzeng' not in collected:
+                        collected['xinzeng'] = {'initial': 0}
+                    for key, val in dom_flows.items():
+                        collected['xinzeng'][key] = val
+
         # 用API数据组装结果
         result = {}
         for crowd_key in CROWD_ORDER:
