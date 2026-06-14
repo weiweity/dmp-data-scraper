@@ -122,7 +122,7 @@ v0.1.17 清理 `dmp_common.py` 死代码时, `from core.utils.dates import parse
 
 ### 验证
 - `cd core && python3 -c "import dmp_master; print('import OK')"` → import OK
-- `PYTHONPATH=. pytest core/tests/ -q` → **108/108 passed** (v0.1.23 累计)
+- `PYTHONPATH=. pytest core/tests/ -q` → **113/113 passed** (v0.1.24 累计)
 
 ### Metadata
 - Related Files: `core/dmp_common.py`

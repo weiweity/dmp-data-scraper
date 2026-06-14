@@ -65,8 +65,8 @@ codegraph callers . read_account                  # 反向追踪
 |---|---|
 | 项目路径 | `/Users/hutou/Desktop/fuqin-date/fuqing-scraper` |
 | GitHub | `git@github.com:weiweity/dmp-data-scraper.git` |
-| 版本 | **v0.1.23** (2026-06-14) |
-| pytest | **108/108 passed** (v0.1.17 后 +19) |
+| 版本 | **v0.1.24** (2026-06-14) |
+| pytest | **113/113 passed** (v0.1.17 后 +24) |
 | 跑批业务 | data3.csv ~7200 行 (单品洞察, 每日) |
 | 索引统计 | 40 files / 566 nodes / 1573 edges (1.70 MB) |
 
@@ -90,7 +90,7 @@ core/
 ├── config/                       ← items.yaml + settings.py
 ├── utils/                        ← dates.py / account.py / log.py / t_offset.py / csv_state.py
 ├── validators/                   ← items/assets/flow 3 validators
-└── tests/                        ← conftest.py + 108 tests
+└── tests/                        ← conftest.py + 113 tests
 ```
 
 > 💡 **架构探查**: 不确定某函数在哪个文件？用 `codegraph_explore "dmp_master 入口分发"` 一次拿到。
@@ -132,7 +132,7 @@ cd /Users/hutou/Desktop/fuqin\-date/fuqing-scraper
 pip install playwright pyyaml
 playwright install chromium
 
-# 跑测试 (108/108 passed)
+# 跑测试 (113/113 passed)
 PYTHONPATH=. pytest core/tests/ -v
 
 # 一键启动 (项目根)
@@ -167,7 +167,7 @@ BACKFILL_DAYS=30 ./run.sh -i     # 历史回填 30 天
 ```bash
 # 1. 验证 pytest
 PYTHONPATH=. pytest core/tests/ -v
-# 期望: 108 passed
+# 期望: 113 passed
 
 # 2. 验证 ruff lint
 ruff check core/
