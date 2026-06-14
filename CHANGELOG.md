@@ -4,6 +4,32 @@
 
 ---
 
+## [v0.1.22] - 2026-06-14 - fix(flow): xinzeng transfer API 响应慢导致轮询错过，改 25s 轮询
+
+### 背景
+用户反馈 6/7 起 xinzeng 流转数据全 0。临时加日志调试后发现：
+- `statusId=0` 的 `/asset/deeplink/transfer` API **确实返回** xinzeng transform 数据
+- 但响应延迟约 **10~15 秒**
+- 原代码 reload 后固定 `time.sleep(8)` 再取数，经常在响应到达前就判定为空，然后写 0
+
+### Fixed
+- **core/dmp_flow_scraper.py**: xinzeng reload 后改为每秒轮询 `collector.get_data()`，最多 25 秒，检测到 `faxian > 0` 立即停止。
+- 保留 v0.1.21 的 DOM fallback 作为最后防线。
+
+### 验证
+- `PYTHONPATH=. pytest core/tests/ -q` → **108/108 passed**
+
+### 后续操作
+6/7~6/12 已写入的 xinzeng 零值仍需清理后重跑：
+1. 删除 `data.csv` 中 2026/06/07 ~ 2026/06/12 所有行
+2. 运行 `./START.sh -f`
+
+### Metadata
+- Related Files: `core/dmp_flow_scraper.py`
+- Net diff: 1 文件, +10/-2 行
+
+---
+
 ## [v0.1.21] - 2026-06-14 - fix(flow): xinzeng 流转数据 API 返回空时启用 DOM fallback
 
 ### 背景
