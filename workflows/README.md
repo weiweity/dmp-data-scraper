@@ -1,6 +1,6 @@
 # DMP 项目 Workflows
 
-> 最后更新：2026-06-07
+> 最后更新：2026-06-14
 > 项目目标：保留核心 DMP 抓数功能和前端需要的 date, date2, date3 文件
 
 ---
@@ -93,6 +93,20 @@ Workflow({scriptPath: "dmp-data-verify.js"})
 Workflow({scriptPath: "dmp-monitor.js"})
 ```
 
+### 6. 优化执行工作流
+
+**文件**：`dmp-optimization.js`
+**用途**：执行性能/数据质量优化任务
+**阶段**：
+- 任务调度：按需执行优化任务
+- 结果验证：验证优化效果
+
+**运行方式**：
+```bash
+# 在 Claude Code 中运行
+Workflow({scriptPath: "dmp-optimization.js"})
+```
+
 ---
 
 ## 工作流使用指南
@@ -104,13 +118,13 @@ Workflow({scriptPath: "dmp-monitor.js"})
 ```javascript
 // 运行每日数据采集工作流
 Workflow({
-  scriptPath: "scraper/workflows/dmp-daily-run.js",
+  scriptPath: "workflows/dmp-daily-run.js",
   name: "dmp-daily-run"
 })
 
 // 运行数据修复工作流
 Workflow({
-  scriptPath: "scraper/workflows/dmp-data-fix.js",
+  scriptPath: "workflows/dmp-data-fix.js",
   name: "dmp-data-fix"
 })
 ```
@@ -129,7 +143,7 @@ Workflow({
 
 ```javascript
 Workflow({
-  scriptPath: "scraper/workflows/dmp-daily-run.js",
+  scriptPath: "workflows/dmp-daily-run.js",
   resumeFromRunId: "wf_xxxxxxxx"
 })
 ```

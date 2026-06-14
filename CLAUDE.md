@@ -65,8 +65,8 @@ codegraph callers . read_account                  # 反向追踪
 |---|---|
 | 项目路径 | `/Users/hutou/Desktop/fuqin-date/fuqing-scraper` |
 | GitHub | `git@github.com:weiweity/dmp-data-scraper.git` |
-| 版本 | **v0.1.0** (2026-06-13) |
-| pytest | **58/58 passed** |
+| 版本 | **v0.1.23** (2026-06-14) |
+| pytest | **108/108 passed** (v0.1.17 后 +19) |
 | 跑批业务 | data3.csv ~7200 行 (单品洞察, 每日) |
 | 索引统计 | 32 files / 486 nodes / 1367 edges (1.45 MB) |
 
@@ -76,19 +76,21 @@ codegraph callers . read_account                  # 反向追踪
 
 ## 1. 三层架构 (Master + Common + Scraper)
 
+22 模块分层详见 [`docs/maintenance/ARCHITECTURE.md` §3](docs/maintenance/ARCHITECTURE.md#3-三层架构-master--common--scraper)。
+
 ```
 core/
 ├── dmp_master.py                 ← 统一入口 (--assets/--flow/--items)
-├── dmp_common.py                 ← 公共模块 (Config/BrowserManager/login/CSV 工具, 825 行 re-export shim)
+├── dmp_common.py                 ← 公共模块 (re-export shim, ~810 行)
 ├── dmp_scraper.py                ← 资产诊断 (Y轴锚点 DOM 抓取)
 ├── dmp_flow_scraper.py           ← 流转数据 (Network API 拦截 + statusId=0 DOM 回退)
-├── dmp_item_insight_scraper.py   ← 单品洞察 (API 拦截 + Date Sanity Check, 2829 行)
+├── dmp_item_insight_scraper.py   ← 单品洞察 (API 拦截 + Date Sanity Check, ~3250 行)
 ├── anti_detect.py                ← 反检测模块 (10 层防御)
 ├── sanity_check.py               ← 数据质量检查 (6 道门禁)
 ├── config/                       ← items.yaml + settings.py
-├── utils/                        ← dates.py / account.py / log.py / t_offset.py
+├── utils/                        ← dates.py / account.py / log.py / t_offset.py / csv_state.py
 ├── validators/                   ← items/assets/flow 3 validators
-└── tests/                        ← conftest.py + 58 tests
+└── tests/                        ← conftest.py + 108 tests
 ```
 
 > 💡 **架构探查**: 不确定某函数在哪个文件？用 `codegraph_explore "dmp_master 入口分发"` 一次拿到。
@@ -130,7 +132,7 @@ cd /Users/hutou/Desktop/fuqin\-date/fuqing-scraper
 pip install playwright pyyaml
 playwright install chromium
 
-# 跑测试 (58/58 passed)
+# 跑测试 (108/108 passed)
 PYTHONPATH=. pytest core/tests/ -v
 
 # 一键启动 (项目根)
@@ -165,7 +167,7 @@ BACKFILL_DAYS=30 ./run.sh -i     # 历史回填 30 天
 ```bash
 # 1. 验证 pytest
 PYTHONPATH=. pytest core/tests/ -v
-# 期望: 58 passed
+# 期望: 108 passed
 
 # 2. 验证 ruff lint
 ruff check core/
