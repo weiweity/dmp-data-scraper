@@ -173,4 +173,4 @@ for attempt in range(max_wait):
 - [ ] 看 `core/dmp_flow_scraper.py` 的 `all_status_ids` 顺序, 知道 xinzeng 在首位
 - [ ] 看 `core/run.sh` / `START.sh`, 知道有 `-m/-s/-t/-b` 4 个新选项
 - [ ] 跑 `./START.sh -s` 看 data3.csv 状态, 验证环境 OK
-- [ ] 跑 `PYTHONPATH=. pytest core/tests/ -q` 看 108/108 passed
+- [ ] 跑 `PYTHONPATH=. pytest core/tests/ -q` 看 113/113 passed

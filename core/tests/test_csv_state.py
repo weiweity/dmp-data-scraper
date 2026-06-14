@@ -105,17 +105,22 @@ def test_get_missing_dates_in_range(tmp_path: Path) -> None:
 
 
 def test_get_state_for_real_csv_data3() -> None:
-    """集成测试: 跑 csv_state 在真实 data3.csv 上, 验证 latest 真的是 6/12 (不是 5/9 错乱)."""
+    """集成测试: 跑 csv_state 在真实 data3.csv 上, 验证 latest 跟总行数.
+
+    v0.1.20 修了 T-1 Date Sanity 之后, latest 不再卡在 6/12, 而是随每日跑批前进.
+    用动态断言 (latest 至少是 6/12, 而不是 == 6/12), 防止测试自身被跑批结果绑死.
+    """
     csv_path = Path(__file__).parent.parent / "data3.csv"
     if not csv_path.exists():
         pytest.skip("data3.csv not found (skip integration test)")
 
     state = get_state(str(csv_path))
-    # 真实 data3.csv 在 6/14 跑完 Round 1-3 后, latest 应该是 6/12
-    assert state.latest_date == date(2026, 6, 12), \
-        f"data3.csv latest 应该是 2026/06/12, 实际 {state.latest_date}"
-    # 5/1-6/12 共 43 天 × 15 商品 = 645 行 (允许一些历史数据偏差)
-    assert state.total_rows >= 645, f"data3.csv 至少 645 行, 实际 {state.total_rows}"
+    # 历史 snapshot: v0.1.15 修复 csv_state 那天, latest 至少 6/12 (实际 6/14 已 6/13).
+    # 用" >= "而非" == ", 防止 latest 推进让测试报错.
+    assert state.latest_date >= date(2026, 6, 12), \
+        f"data3.csv latest 倒退? 期望 >= 2026/06/12, 实际 {state.latest_date}"
+    # 5/1-6/13 共 44 天 × 15 商品 = 660 行 (允许一些历史数据偏差)
+    assert state.total_rows >= 660, f"data3.csv 至少 660 行, 实际 {state.total_rows}"
 
 
 def test_print_state_does_not_crash(tmp_path: Path, capsys) -> None:

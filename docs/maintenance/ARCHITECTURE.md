@@ -55,7 +55,7 @@ core/
 ├── config/                       ← items.yaml + settings.py
 ├── utils/                        ← dates.py / account.py / log.py / t_offset.py / csv_state.py
 ├── validators/                   ← items/assets/flow 3 个 validator
-└── tests/                        ← conftest.py + 108 tests
+└── tests/                        ← conftest.py + 113 tests
 ```
 
 ### 3.1 dmp_master.py (入口,775 行)

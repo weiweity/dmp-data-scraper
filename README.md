@@ -1,13 +1,13 @@
 # fuqing-scraper (芙清 DMP 数据采集)
 
 > 达摩盘 SPA 自动抓数, 独立 git repo
-> **v0.1.23** (2026-06-14)
+> **v0.1.24** (2026-06-14)
 
 独立 git repo, 22 模块拆分, **只负责爬虫 + 生成数据**, 跟其他项目无依赖。
 
 - **项目路径**: `/Users/hutou/Desktop/fuqin-date/fuqing-scraper`
 - **GitHub**: `git@github.com:weiweity/dmp-data-scraper.git`
-- **pytest**: **108/108 passed** (v0.1.17 后加 19 个 P1 测试)
+- **pytest**: **113/113 passed** (v0.1.17 后加 24 个 P1 测试)
 - **跑批业务**: data3.csv ~7200 行 (单品洞察, 每日)
 
 ## 三大数据产品
@@ -24,7 +24,7 @@
 cd /Users/hutou/Desktop/fuqin\-date/fuqing-scraper
 pip install playwright pyyaml
 playwright install chromium
-PYTHONPATH=. pytest core/tests/ -v   # 108/108 passed
+PYTHONPATH=. pytest core/tests/ -v   # 113/113 passed
 cd core
 python3 dmp_master.py --items  # 单品洞察
 T_OFFSET=2 python3 dmp_master.py --items  # 早 9:00 (T-2)
@@ -34,7 +34,7 @@ T_OFFSET=1 python3 dmp_master.py --items  # 下午 16:00 (T-1)
 ## 验证
 
 ```bash
-PYTHONPATH=. pytest core/tests/ -v   # 108/108 passed
+PYTHONPATH=. pytest core/tests/ -v   # 113/113 passed
 ruff check core/
 wc -l core/data3.csv               # ≥ 7000 行
 ```

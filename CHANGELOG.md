@@ -4,6 +4,52 @@
 
 ---
 
+## [v0.1.24] - 2026-06-14 - chore(items): 删 3 个死函数 + 修 1 个测试预存债
+
+### 背景
+用户调研"单品抓取是 API 还是 DOM"时, 发现 `dmp_item_insight_scraper.py` 有 3 个函数
+(`extract_item_data_by_dom` / `extract_item_data_by_api` / `extract_item_data`) 从未被任何
+代码调用, 死代码存在多版本, 总计 ~688 行 (含 1 个孤注释)。
+
+主流程 `fetch_item_data` (L419-) 实际只用 `_ItemAssetCollector` 类 (L1661-) 做 API 拦截,
+3 个 dead function 是 v0.1.0~v0.1.16 期间的早期方案遗留。
+
+### Removed
+- **core/dmp_item_insight_scraper.py**:
+  - `extract_item_data_by_dom(page)` (95 行): 旧版 DOM 抓, label 找相邻数字
+  - `extract_item_data_by_api(page, item_id, target_date)` (83 行): 旧版 API 拦截, 复用 `_ItemAssetCollector`
+  - `extract_item_data(page)` (503 行): 旧版多路径 fallback, 含 page.evaluate 大块 JS
+  - 死注释 `# parse_number函数已在公共模块中定义...` (1 行)
+  - 合计: **~688 行** (-688/+0, 文件 3253 → 2565 行)
+
+### Fixed
+- **core/tests/test_csv_state.py::test_get_state_for_real_csv_data3**:
+  - latest 硬编码 `== 2026/06/12` → `>= 2026/06/12` (动态断言)
+  - 6/12 这个具体值是 v0.1.15 写测试时的快照, 跑批继续前进后, 硬编码等于把测试绑死
+  - 改" >= "后, 6/13/6/14/... 跑批成功都不会让测试 fail, 但 latest 倒退仍会拦截
+
+### Added
+- **core/tests/test_dead_code_guard.py** (5 tests):
+  - `test_item_status_map_has_all_six_entries` — 6 个 statusId 全在
+  - `test_item_asset_collector_default_threshold` — collector 默认 20000
+  - `test_item_asset_collector_explicit_threshold` — 显式阈值优先
+  - `test_validate_item_data_still_importable` — 防止删 dead function 时误伤
+  - `test_no_external_callers_of_dead_functions` — grep 守卫, 防复活
+
+### 验证
+- `PYTHONPATH=. pytest core/tests/ -q` → **113/113 passed** (108 旧 + 5 新)
+- 死代码清理前 `grep -rn "extract_item_data(_by_api|_by_dom)?\b" --include="*.py"` → 0 真调用方 (注释提及不算)
+
+### Lesson
+v0.1.17 的 parse_number 教训重演: Claude 删"看似没用"的代码前, 必须**先 grep 实证 0 调用**,
+不能信"看起来没用"。本次用户授权 + 实证 + 加守卫测试, 三层保险。
+
+### Metadata
+- Related Files: `core/dmp_item_insight_scraper.py`, `core/tests/test_dead_code_guard.py`, `core/tests/test_csv_state.py`
+- Net diff: 3 files, +69/-689 行
+
+---
+
 ## [v0.1.23] - 2026-06-14 - fix(flow): xinzeng retry 用 page.goto 替代 reload, 延长轮询至 30s
 
 ### 背景
