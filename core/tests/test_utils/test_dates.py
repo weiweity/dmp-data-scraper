@@ -5,7 +5,6 @@
 """
 from datetime import date, datetime
 
-import pytest
 
 from core.utils.dates import format_date_for_csv, parse_date
 

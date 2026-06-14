@@ -702,12 +702,12 @@ def fetch_item_data(page, item_id, target_date, fallback_date):
                             # SPA 显示"昨日"，实际数据日期是昨天
                             data['_actual_data_date'] = yesterday_str
                             data['_data_refresh_status'] = 'refreshed'
-                            log(f"✓ 数据已刷新（SPA 显示'昨日'），实际数据日期: {yesterday_str}")
+                            log(f"✅ 数据已刷新（SPA 显示'昨日'），实际数据日期: {yesterday_str}")
 
                             # 2026-06-13 增强（ERR-20260613-002）：T-1 早退路径
                             # 当 target_date == T-1 时，SPA 默认就是 T-1，匹配成功是正常情况
                             if date_str == yesterday_str:
-                                log(f"✓ T-1 匹配：target_date={date_str} == SPA 昨日={yesterday_str}")
+                                log(f"✅ T-1 匹配：target_date={date_str} == SPA 昨日={yesterday_str}")
                             else:
                                 # 关键：如果 target_date 不是昨天，说明 URL 日期参数未生效
                                 # 达摩盘回退到了最新数据，不能将其作为 target_date 的数据
@@ -729,7 +729,7 @@ def fetch_item_data(page, item_id, target_date, fallback_date):
                                     return None
                                 else:
                                     data['_data_refresh_status'] = 'matched'
-                                    log(f"✓ 日期匹配: URL 目标 = SPA 实际 = {date_str}")
+                                    log(f"✅ 日期匹配: URL 目标 = SPA 实际 = {date_str}")
             except Exception as e:
                 log(f"读取 SPA trigger 日期失败（不影响主流程）: {e}")
 
@@ -995,7 +995,7 @@ def _autoheal_find_trigger(page, candidates) -> tuple:
             # 检查是否弹出日历
             popup = page.locator("[id^='days_mx_output_']").first
             if popup.is_visible():
-                log(f"  [_autoheal_find_trigger] ✓ 候选 {i+1} 点击后弹出日历, auto-heal 成功")
+                log(f"  [_autoheal_find_trigger] ✅ 候选 {i+1} 点击后弹出日历, auto-heal 成功")
                 return el, f"autoheal-{cand.get('id') or cand.get('class', 'unknown')[:20]}"
 
             # 关闭可能误开的弹窗
@@ -2881,7 +2881,7 @@ def append_tocsv(csv_file, data):
                 reader = csv.DictReader(f)
                 for row in reader:
                     if row.get('ID', '') == data['item_id'] and row.get('时间', '') == data['date']:
-                        log(f"⏭️ 数据已存在: 商品{data['item_id']} 日期{data['date']}，跳过")
+                        log(f"⚠️ 数据已存在: 商品{data['item_id']} 日期{data['date']}，跳过")
                         _mark_completed(data['item_id'], data['date'])
                         return True  # 已存在不算失败
         except Exception as e:

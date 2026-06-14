@@ -10,13 +10,12 @@ csv_state.py 强制 parse_date → date 对象后 min/max, 杜绝此类错误.
   4. CLI 用法
 """
 import csv
-import tempfile
 from datetime import date
 from pathlib import Path
 
 import pytest
 
-from core.utils.csv_state import CSVState, get_missing_dates_in_range, get_state, print_state
+from core.utils.csv_state import get_missing_dates_in_range, get_state, print_state
 
 
 def _write_csv(tmp_path: Path, rows: list) -> Path:

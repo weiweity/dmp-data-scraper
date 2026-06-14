@@ -94,16 +94,16 @@ def _recreate_page_and_login(browser, page, username, password):
     try:
         new_page = browser.new_page()
         new_page.set_viewport_size({'width': 1920, 'height': 1080})
-        log("✓ 新页面创建成功，重新登录...")
+        log("✅ 新页面创建成功，重新登录...")
         
         if login_qianniu(new_page, username, password):
-            log("✓ 重新登录成功")
+            log("✅ 重新登录成功")
             return new_page
         else:
-            log("✗ 重新登录失败")
+            log("❌ 重新登录失败")
             return None
     except Exception as e:
-        log(f"✗ 创建新页面或重新登录失败: {e}")
+        log(f"❌ 创建新页面或重新登录失败: {e}")
         return None
 
 
@@ -148,12 +148,12 @@ def run_assets_module(page, username, password):
             if data and len(data) >= 4:
                 dmp_scraper.append_to_csv(Config.ASSETS_DATA_FILE, date_obj, data)
                 success_count += 1
-                log(f"✓ {date_obj} 数据抓取成功")
+                log(f"✅ {date_obj} 数据抓取成功")
             else:
-                log(f"✗ {date_obj} 数据抓取失败或数据不足")
+                log(f"❌ {date_obj} 数据抓取失败或数据不足")
                 fail_dates.append(date_obj)
         except Exception as e:
-            log(f"✗ {date_obj} 抓取出错: {e}")
+            log(f"❌ {date_obj} 抓取出错: {e}")
             fail_dates.append(date_obj)
     
     # ========== 失败重试机制（2026-05-20新增）==========
@@ -170,12 +170,12 @@ def run_assets_module(page, username, password):
                 if data and len(data) >= 4:
                     dmp_scraper.append_to_csv(Config.ASSETS_DATA_FILE, date_obj, data)
                     success_count += 1
-                    log(f"✓ [重试成功] {date_obj}")
+                    log(f"✅ [重试成功] {date_obj}")
                 else:
                     still_failed.append(date_obj)
-                    log(f"✗ [重试失败] {date_obj} 数据不足")
+                    log(f"❌ [重试失败] {date_obj} 数据不足")
             except Exception as e:
-                log(f"✗ [重试异常] {date_obj}: {e}")
+                log(f"❌ [重试异常] {date_obj}: {e}")
                 still_failed.append(date_obj)
         fail_dates = still_failed
     
@@ -406,7 +406,7 @@ def run_items_module(page, username, password):
                                 log(f"⚠️ 数据状态: 日期不匹配，{data.get('_date_mismatch_reason')}")
                                 log(f"   → 实际数据日期={actual_date}，记录日期={date_str_task}")
                             elif status == 'matched':
-                                log(f"✓ 数据状态: 日期匹配，实际数据日期={actual_date}")
+                                log(f"✅ 数据状态: 日期匹配，实际数据日期={actual_date}")
                     except Exception as sc_err:
                         # sanity_check 异常 → 不影响主流程，仅记录
                         log(f"⚠️ sanity_check.run_all 异常（不阻塞写入）: {sc_err}")
@@ -419,16 +419,16 @@ def run_items_module(page, username, password):
                             dmp_item_insight_scraper._mark_completed(item_id, date_str_task)
                         except Exception as e:
                             log(f"⚠️ 写入完成缓存失败（非致命）: {e}")
-                        log(f"✓ 商品 {item_id} 日期 {date_str_task} 写入成功")
+                        log(f"✅ 商品 {item_id} 日期 {date_str_task} 写入成功")
                     else:
-                        log(f"✗ 商品 {item_id} 日期 {date_str_task} 保存失败")
+                        log(f"❌ 商品 {item_id} 日期 {date_str_task} 保存失败")
                         fail_tasks.append(task)
                 else:
                     log(f"  商品 {item_id} 日期 {date_str_task} 数据为空，跳过")
                     dmp_item_insight_scraper._mark_completed(item_id, date_str_task)
             except Exception as e:
                 error_msg = str(e).lower()
-                log(f"✗ 商品 {item_id} 日期 {date_str_task} 出错: {e}")
+                log(f"❌ 商品 {item_id} 日期 {date_str_task} 出错: {e}")
                 fail_tasks.append(task)
                 if 'closed' in error_msg or 'target' in error_msg:
                     log("⚠️ 浏览器崩溃，向上传播")
@@ -502,22 +502,22 @@ def run_items_module(page, username, password):
                             dmp_item_insight_scraper._mark_completed(item_id, date_str)
                         except Exception as mc_err:
                             log(f"⚠️ 写入完成缓存失败（非致命）: {mc_err}")
-                        log(f"✓ [重试成功] 商品 {item_id} 日期 {date_str}")
+                        log(f"✅ [重试成功] 商品 {item_id} 日期 {date_str}")
                     else:
                         still_failed.append(task)
                         retry_count += 1
-                        log(f"✗ [重试失败-保存] 商品 {item_id} 日期 {date_str}")
+                        log(f"❌ [重试失败-保存] 商品 {item_id} 日期 {date_str}")
                 else:
                     still_failed.append(task)
                     retry_count += 1
-                    log(f"✗ [重试失败-空数据] 商品 {item_id} 日期 {date_str}")
+                    log(f"❌ [重试失败-空数据] 商品 {item_id} 日期 {date_str}")
                 
                 if i < len(fail_tasks):
                     time.sleep(2)
                     
             except Exception as e:
                 error_msg = str(e).lower()
-                log(f"✗ [重试异常] 商品 {item_id} 日期 {date_str}: {e}")
+                log(f"❌ [重试异常] 商品 {item_id} 日期 {date_str}: {e}")
                 still_failed.append(task)
                 retry_count += 1
                 
@@ -617,13 +617,13 @@ def main():
             log("=" * 60)
             
             if check_dmp_session(page):
-                log("✓ 会话有效，跳过登录流程")
+                log("✅ 会话有效，跳过登录流程")
             else:
                 log("会话已过期，需要重新登录")
                 if not login_qianniu(page, username, password, debug_name="master_login"):
                     log("登录失败，退出")
                     return False
-                log("✓ 登录成功！")
+                log("✅ 登录成功！")
             
             # 验证达摩盘可达性（快速健康检查）
             log("\n验证达摩盘可达性...")
@@ -640,7 +640,7 @@ def main():
                     log(f"   当前路由: {Config.DMP_ROUTE_ASSETS}")
                     log("   请手动确认达摩盘URL格式是否变化")
                 else:
-                    log("✓ 达摩盘可达性检查通过")
+                    log("✅ 达摩盘可达性检查通过")
             except Exception as e:
                 log(f"⚠️ 达摩盘健康检查失败: {e}（继续尝试抓取）")
             
@@ -663,7 +663,7 @@ def main():
                         if new_page:
                             page = new_page
                         else:
-                            log("✗ 页面重建失败，后续模块可能无法正常工作")
+                            log("❌ 页面重建失败，后续模块可能无法正常工作")
             
             if args.flow:
                 try:
@@ -681,7 +681,7 @@ def main():
                         if new_page:
                             page = new_page
                         else:
-                            log("✗ 页面重建失败，后续模块可能无法正常工作")
+                            log("❌ 页面重建失败，后续模块可能无法正常工作")
             
             if args.items:
                 # 单品模块可能耗时较长，增加崩溃重试机制
@@ -706,7 +706,7 @@ def main():
                                 new_page = browser.new_page()
                                 new_page.set_viewport_size({'width': 1920, 'height': 1080})
                                 page = new_page
-                                log("✓ 在当前上下文中创建新页面成功")
+                                log("✅ 在当前上下文中创建新页面成功")
                             except Exception:
                                 # 上下文已崩溃，需要重建整个 BrowserManager
                                 log("⚠️ 浏览器上下文已损坏，尝试完整重建...")
@@ -721,18 +721,18 @@ def main():
                                     page.set_viewport_size({'width': 1920, 'height': 1080})
                                     # 注意：这里 browser 被重新赋值，但旧 browser 已在 __exit__ 中关闭
                                     browser = new_browser
-                                    log("✓ 浏览器上下文完全重建成功")
+                                    log("✅ 浏览器上下文完全重建成功")
                                 except Exception as rebuild_err:
-                                    log(f"✗ 浏览器上下文重建失败: {rebuild_err}")
+                                    log(f"❌ 浏览器上下文重建失败: {rebuild_err}")
                                     results['items'] = (0, 0)
                                     break
                             
                             log("重新登录...")
                             if login_qianniu(page, username, password):
-                                log("✓ 重新登录成功，继续单品模块")
+                                log("✅ 重新登录成功，继续单品模块")
                                 continue
                             else:
-                                log("✗ 重新登录失败")
+                                log("❌ 重新登录失败")
                                 results['items'] = (0, 0)
                                 break
                         else:

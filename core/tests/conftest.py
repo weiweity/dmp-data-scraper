@@ -1,5 +1,4 @@
 """Shared pytest fixtures for core tests."""
-import os
 from pathlib import Path
 
 import pytest

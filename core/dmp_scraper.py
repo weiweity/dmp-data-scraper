@@ -153,10 +153,10 @@ def fetch_data_for_date(page, date_obj):
 
         if data and len(data) >= 5:
             total_val = data[0] if data else 0
-            log(f"✓ {date_obj} 资产诊断数据抓取成功: TOTAL={total_val:,}")
+            log(f"✅ {date_obj} 资产诊断数据抓取成功: TOTAL={total_val:,}")
             return data
         else:
-            log(f"✗ {date_obj} 资产诊断数据不足 (len={len(data) if data else 0})")
+            log(f"❌ {date_obj} 资产诊断数据不足 (len={len(data) if data else 0})")
             return None
 
     except Exception as e:
@@ -557,7 +557,7 @@ def append_to_csv(csv_file, date_obj, data):
         prev_vals = [_sv(existing_rows[-1].get(f, 0)) for f in _ASSET_FIELDS]
         curr_vals = [_sv(new_row.get(f, 0)) for f in _ASSET_FIELDS]
         if prev_vals == curr_vals:
-            log(f"⏭️ 资产诊断 {date_str} 与最新一条完全相同，判定为T+1未更新，跳过写入")
+            log(f"⚠️ 资产诊断 {date_str} 与最新一条完全相同，判定为T+1未更新，跳过写入")
             return True
         # 变化率<0.01%也视为无新数据
         all_within = all(
@@ -565,7 +565,7 @@ def append_to_csv(csv_file, date_obj, data):
             for p, c in zip(prev_vals, curr_vals)
         )
         if all_within:
-            log(f"⏭️ 资产诊断 {date_str} 变化率<0.01%，判定为T+1噪声，跳过写入")
+            log(f"⚠️ 资产诊断 {date_str} 变化率<0.01%，判定为T+1噪声，跳过写入")
             return True
 
     # 合并并写回
@@ -632,7 +632,7 @@ def main():
                 log("千牛登录失败，退出")
                 return False
             
-            log("\\n✓ 登录成功！")
+            log("\\n✅ 登录成功！")
             
             # 循环抓取
             for date_obj in missing_dates:
@@ -646,12 +646,12 @@ def main():
                     if data and len(data) >= 4:
                         if append_to_csv(Config.ASSETS_DATA_FILE, date_obj, data):
                             success_count += 1
-                            log(f"✓ {date_obj} 数据抓取成功")
+                            log(f"✅ {date_obj} 数据抓取成功")
                         else:
-                            log(f"✗ {date_obj} 数据保存失败")
+                            log(f"❌ {date_obj} 数据保存失败")
                             fail_dates.append(date_obj)
                     else:
-                        log(f"✗ {date_obj} 数据抓取失败或数据不足")
+                        log(f"❌ {date_obj} 数据抓取失败或数据不足")
                         fail_dates.append(date_obj)
                     
                     # 间隔
@@ -659,7 +659,7 @@ def main():
                         time.sleep(3)
                         
                 except Exception as e:
-                    log(f"✗ {date_obj} 抓取出错: {e}")
+                    log(f"❌ {date_obj} 抓取出错: {e}")
                     fail_dates.append(date_obj)
                     
         except Exception as e:

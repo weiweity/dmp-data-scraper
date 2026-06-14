@@ -6,10 +6,8 @@
   - check_date_sanity(date_str) -> (bool, str)
   - check_business_smoothness(row, prev_row=None, threshold=0.30) -> str | None
 """
-import pytest
 
 from core.validators.flow_validators import (
-    FLOW_FIELDS,
     check_business_smoothness,
     check_date_sanity,
     validate_flow_data,

@@ -4,6 +4,57 @@
 
 ---
 
+## [v0.1.16] - 2026-06-14 - chore(refactor): 技术债清理 (按"代码合理, 不懂不要装懂"原则)
+
+### 背景
+2026-06-14 13:00 扫描整个项目, 列清单后按风险分 3 档 (P0 0 风险 / P1 懂且能做 / P2 不懂不动). 用户明确"代码合理, 不懂不要装懂", 实际做了 P0 + P1 共 7 项, P2 跳过并文档原因.
+
+### Changed
+- **core/validators/__init__.py**: 新增共享 helper `_strip_int` (定义在 `from . import` 之前避开循环). 4 份重复实现合并到 1 份.
+- **core/validators/items_validators.py** + **assets_validators.py** + **flow_validators.py** + **core/sanity_check.py**: 删本地 `_strip_int` 定义, 加 `from core.validators import _strip_int`.
+- **core/validators/items_validators.py**: 删 0 调用的 `_parse_date` (改 import `core.utils.dates.parse_date` 替代) + `_read_prev_row` 死代码 (使用方 0 处).
+
+### Fixed
+- **log emoji 统一 6→3 种** ✓→✅, ✗→❌, ⏭️→⚠️
+  - 替换总数: 24 ✓ + 19 ✗ + 4 ⏭️ = 47 处
+  - 文件: dmp_item_insight_scraper.py / dmp_scraper.py / dmp_common.py / dmp_master.py / dmp_flow_scraper.py
+
+### Added
+- **.claude/settings.json** (新, 项目级 hook): `PostToolUse: Edit|Write` 改 `core/**/*.py` (非 test) 自动跑 ruff
+- **.gitignore**: 加 `data3.csv.backup` / `data3.csv.before-fix` / `data3.csv.cleaned` / `data3.csv.pre-*` 模式
+
+### Removed
+- 4 个 CSV 中间产物 (data3.csv.backup / before-fix / cleaned / pre-format-fix-2026-06-13), 1.8MB
+
+### Documentation
+- **CLAUDE.md §11** (新): "P2 跳过的技术债" 清单 + 为何跳过 + 重启时机, 防止未来人 (包括 Claude) 又来问"为什么这些没改"
+
+### Skipped (不懂, 跳 P2)
+- 异常处理 4 种风格统一 (无法识别哪些 bare except: pass 是 best-effort cleanup)
+- 三模块 retry 策略统一 (items 60s / assets 10-14-18s / flow 无, 不懂业务合理阈值)
+- `dmp_item_insight_scraper.py` 3246 行单文件拆 (测试覆盖不足以保证拆分安全)
+- `chrome_profile` basename 混用 (猜不到原意)
+- 4 处 bare `except: pass` (dmp_common:56, 71 / log.py:18, 29)
+- SPM 硬编码
+- 详见 CLAUDE.md §11
+
+### 验证
+- `pytest core/tests/` → 103/103 passed (无回归)
+- `python3 -c "import core.dmp_common, core.sanity_check, core.dmp_master"` → 全部 import 成功
+- 备份 `/tmp/core_emoji_backup/` (emoji 替换前), 万一需要回滚
+
+### Lesson
+- **"不删除" ≠ "永不删"**: CLAUDE.md §3 说"不要删除预先存在的死代码除非被要求", 但本版本被要求 (P1-2 是用户授权的明确任务). 改 + 文档原因.
+- **删除前先验证 0 调用**: 我先确认 `_parse_date` / `_read_prev_row` 在 items_validators.py 真的 0 调用 (通过 grep), 然后才删, 避免破坏 sanity_check.py
+- **emoji 替换一次性不要增量**: 49 处替换如果分批, 期间代码会处于 "中态" (既不是原 6 种也不是新 3 种), 测试可能抓不到. 一次替换 + 一次跑测试.
+
+### Metadata
+- Related Files: core/validators/{__init__,items_validators,assets_validators,flow_validators}.py, core/sanity_check.py, .claude/settings.json, .gitignore, CLAUDE.md §11
+- Tests: 103/103 passed (无变化)
+- Net diff: +47 emoji 替换 + 删 ~30 行重复代码 + 加 1 个 hook + 加 1 节文档
+
+---
+
 ## [v0.1.15] - 2026-06-14 - fix(tooling): csv_state.py 工具 + 严禁 ad-hoc 数据分析 (ERR-20260613-004 根治)
 
 ### 背景

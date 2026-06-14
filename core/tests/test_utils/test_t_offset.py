@@ -1,7 +1,6 @@
 """Tests for T_OFFSET / get_target_date utilities."""
 from datetime import date, timedelta
 
-import pytest
 
 from core.utils.t_offset import get_target_date
 
