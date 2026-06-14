@@ -119,17 +119,30 @@ playwright install chromium
 # 跑测试 (58/58 passed)
 PYTHONPATH=. pytest core/tests/ -v
 
-# 跑批 (单 module, 5-10 min)
+# 一键启动 (项目根)
+./START.sh                       # 运行全部模块
+./START.sh -i                    # 单品洞察 (默认 T-1)
+./START.sh -t 2 -i               # 单品洞察 T-2
+./START.sh -b 30 -i              # 单品洞察回填 30 天
+./START.sh -m                    # 实时监控最新日志
+./START.sh -s                    # 查看 data3.csv 数据状态
+
+# core/run.sh (等价入口, 支持交互菜单)
 cd core
-python3 dmp_master.py --items   # 单品洞察 (data3.csv, 每日)
-python3 dmp_master.py --flow    # 流转数据 (data.csv, T-2)
-python3 dmp_master.py --assets  # 资产诊断 (data2.csv, T-1)
-python3 dmp_master.py           # 全部模块
+./run.sh -a                      # 资产诊断 (data2.csv)
+./run.sh -f                      # 流转数据 (data.csv)
+./run.sh -i                      # 单品洞察 (data3.csv, 默认 T-1)
+./run.sh -A                      # 全部模块
+./run.sh -m                      # 实时监控最新日志 (另一个终端)
+./run.sh -s                      # 查看 data3.csv 最新/缺失日期
 
 # 跑批环境变量 (T+1 跨日保护)
-T_OFFSET=2 python3 dmp_master.py --items  # 早 9:00 跑, 补 T-2
-T_OFFSET=1 python3 dmp_master.py --items  # 下午 16:00 跑, 补 T-1
+T_OFFSET=2 ./run.sh -i           # 早 9:00 跑, 补 T-2
+T_OFFSET=1 ./run.sh -i           # 下午 16:00 跑, 补 T-1
+BACKFILL_DAYS=30 ./run.sh -i     # 历史回填 30 天
 ```
+
+> 日志位置: `core/del/run_logs/run_YYYYMMDD_HHMMSS_<module>.log`, 实时写入, 可用 `./run.sh -m` 在另一终端 tail。
 
 ---
 

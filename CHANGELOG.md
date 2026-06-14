@@ -4,6 +4,47 @@
 
 ---
 
+## [v0.1.18] - 2026-06-14 - feat(cli): run.sh/START.sh 支持实时监控、进度快照、环境变量透传
+
+### 背景
+用户排查 `core/run.sh` 与 `START.sh` 后发现两脚本仅支持基础分模块跑批, 缺少实时监控、进度可见、T_OFFSET/BACKFILL_DAYS 等 v0.1.9+ 环境变量的显式入口。本次升级为 shell 入口补全这些能力, 使其成为日常跑批首选入口。
+
+### Added
+- **core/run.sh**:
+  - 运行日志自动写入 `core/del/run_logs/run_YYYYMMDD_HHMMSS_<module>.log` (tee 实时落盘)
+  - `-m, --monitor` 在另一终端 `tail -f` 最新日志 (实时监控)
+  - `-s, --status` 调用 `core.utils.csv_state` 查看 data3.csv 最新/缺失日期
+  - `-t, --t-offset N` 设置 `T_OFFSET` (单品洞察日期偏移)
+  - `-b, --backfill DAYS` 设置 `BACKFILL_DAYS` (历史回填天数)
+  - 环境变量透传: `T_OFFSET BACKFILL_DAYS MAX_BACKFILL_DAYS SKIP_RETRY LARK_ALERTS_ENABLED`
+  - 交互菜单新增 `[6] 实时监控最新日志` / `[7] 查看 data3.csv 数据状态`
+  - 每个模块跑完后打印进度快照 (成功条数 + 最近 3 行日志)
+- **START.sh**: 改为 `run.sh` 的薄包装, 透传所有参数, 帮助文档同步更新。
+
+### Changed
+- **CLAUDE.md §3**: 启动方式示例改为 `./START.sh` / `./run.sh` 新接口, 补充日志位置说明。
+
+### 验证
+- `bash -n core/run.sh && bash -n START.sh` → syntax OK
+- `./run.sh -h` / `./START.sh -h` → 帮助信息正确
+- `./run.sh -s` → csv_state 输出 data3.csv 7223 行 / 最新 2026-06-12
+- `./run.sh -m` (无日志时) → 优雅提示 "暂无运行日志"
+
+### 用法示例
+```bash
+./START.sh -i                 # 单品洞察 T-1
+./START.sh -t 2 -i            # 单品洞察 T-2
+./START.sh -b 30 -i           # 回填 30 天
+./START.sh -m                 # 另一终端实时监控
+./START.sh -s                 # 查看 data3.csv 数据状态
+```
+
+### Metadata
+- Related Files: `core/run.sh`, `START.sh`, `CLAUDE.md §3`
+- Net diff: 3 files, ~+90/-30 行
+
+---
+
 ## [v0.1.17] - 2026-06-14 - test(refactor): WIP 收口 — dmp_common 死代码清理 + 3 个 P1 测试覆盖补齐
 
 ### 背景
