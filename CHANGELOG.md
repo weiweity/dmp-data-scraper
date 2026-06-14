@@ -24,6 +24,11 @@ v0.1.22 把 xinzeng reload 改成轮询 25s 后, 实测仍拿不到 API 数据, 
 - Related Files: `core/dmp_flow_scraper.py`
 - Net diff: 1 文件, +9/-7 行
 
+### Changed (后续 commit f4d6fc8, 同版本延续)
+- **tab 访问顺序调整**: `all_status_ids` 从 `[2001,...,0]` 改为 `[0,2001,...]`, xinzeng 放首位。先发起 transfer 请求, 后续访问其他 tab 时响应异步到达, collector 自然捕获。
+- **主页轮询 60s**: 之前 retry 30s 仍不够, 实测 xinzeng 响应 30s+, 改为轮询最多 60s。
+- **触发条件**: 6/7~6/12 共 6 天 xinzeng 历史数据, 用新顺序重跑后**全部完整恢复**（含 zhongcao/hudong/xingdong/shougou 字段）。
+
 ---
 
 ## [v0.1.22] - 2026-06-14 - fix(flow): xinzeng transfer API 响应慢导致轮询错过，改 25s 轮询
