@@ -4,6 +4,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ---
 
+## 0. 文档路由 (新接手先读这里)
+
+**项目是什么、3 个数据怎么流、22 个模块怎么协作** → [`docs/maintenance/ARCHITECTURE.md`](docs/maintenance/ARCHITECTURE.md)
+
+**跑批失败 / ImportError / Date Sanity 误杀 / xinzeng 全 0** → [`docs/maintenance/HOW-TO-FIX.md`](docs/maintenance/HOW-TO-FIX.md)
+
+**为什么这 4 个 fix 这么改 (parse_number / Date Sanity / xinzeng tab 顺序)** → [`docs/maintenance/LESSONS.md`](docs/maintenance/LESSONS.md)
+
+**怎么读 + 怎么写 CHANGELOG** → [`docs/maintenance/CHANGELOG-GUIDE.md`](docs/maintenance/CHANGELOG-GUIDE.md)
+
+> 本文件以下章节是 CLAUDE 项目的**长期约束** (4 准则 + 关键红线 + Git 工作流), 不是项目结构说明。
+
+---
+
 ## 工作准则 (来自全局 CLAUDE.md, 已自动应用)
 
 > 全局 4 条准则已自动从 `~/.claude/CLAUDE.md` 应用到所有项目。此处副本便于本项目独立查阅。
