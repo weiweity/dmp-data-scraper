@@ -171,7 +171,6 @@ END (with context manager 关浏览器)
 - `CLAUDE.md` — 全局 4 条准则 + 启动/验证/约束
 - `CHANGELOG.md` — 版本事件流 (v0.1.0~v0.1.23)
 - `KB-数据采集-SPA接口拦截.md` — SPA 拦截方法论
-- `core/README-dmp-scraper-launchd.md` — 调度 (T+1 跨日)
 - `docs/maintenance/HOW-TO-FIX.md` — 怎么修 bug
 - `docs/maintenance/LESSONS.md` — 今天 4 个 fix 的教训
 - `docs/maintenance/CHANGELOG-GUIDE.md` — 怎么读 CHANGELOG
