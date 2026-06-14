@@ -4,6 +4,37 @@
 
 ---
 
+## [v0.1.21] - 2026-06-14 - fix(flow): xinzeng 流转数据 API 返回空时启用 DOM fallback
+
+### 背景
+用户发现 2026/6/7 起 data.csv 中 `xinzeng`（新增）人群的 transform 字段全部变为 0:
+- 6/6: xinzeng 有正常的 faxian/zhongcao/hudong/xingdong/shougou 流转值
+- 6/7 ~ 6/12: xinzeng initial > 0, 但所有 transform 为 0
+
+日志显示 scraper 检测到 xinzeng flow 为空后会 reload 页面重试 API, 但 API 仍返回全 0。
+
+### 根因
+`core/dmp_flow_scraper.py` 中已有一个 `extract_xinzeng_flow_by_dom()` 函数（statusId=0 的 DOM fallback）, **但从未被调用**。当 transfer API 对 xinzeng 返回空时, 没有第二道防线, 直接写入了全 0。
+
+### Fixed
+- **core/dmp_flow_scraper.py**: API reload 后 xinzeng 仍无流转数据时, 调用 `extract_xinzeng_flow_by_dom(page)` 提取 DOM 中的桑基图数值, 并合并到 `collected['xinzeng']`。
+
+### 验证
+- `PYTHONPATH=. pytest core/tests/ -q` → **108/108 passed**
+
+### 后续操作
+历史 6/7 ~ 6/12 的 xinzeng 零值需要人工清理后重跑:
+1. 删除 data.csv 中 2026/06/07 ~ 2026/06/12 的所有行（这些日期其他 crowd 数据也受影响, 因为 scraper 按日期抓取）
+2. 运行 `./START.sh -f` 重新抓取流转数据
+
+> 注意: DOM fallback 目前只提取 faxian/zhongcao/hudong/xingdong/shougou 5 个字段, fugou/zhiai 保持为 0（与 6/6 及之前观测一致）。
+
+### Metadata
+- Related Files: `core/dmp_flow_scraper.py`
+- Net diff: 1 文件, +11 行
+
+---
+
 ## [v0.1.20] - 2026-06-14 - fix(items): 修复 T-1 跑批 Date Sanity Check 格式不匹配导致 0/15
 
 ### 背景
