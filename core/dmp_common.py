@@ -38,10 +38,8 @@ from core.utils.dates import (
     parse_date,
     format_date_for_csv,
     normalize_date_str,
-    parse_number,
 )
 from core.utils.account import read_account
-from core.utils.t_offset import get_target_date
 from core.config.settings import Config
 
 
@@ -95,72 +93,6 @@ def detect_encoding(file_path):
 # parse_date / format_date_for_csv / normalize_date_str / parse_number 完整定义在
 # core/utils/dates.py
 # 这里通过 `from core.utils.dates import ...` 重新 export
-
-
-# ============ 账号读取 (WAVE 1 已移到 utils/account.py, 顶部 from re-export) ============
-# read_account 完整定义在 core/utils/account.py
-# 这里通过 `from core.utils.account import read_account` 重新 export
-# (下方保留 read_account 函数体仅为向后兼容, 实际 Wave 1 不再调用)
-
-
-
-    """从 account.txt 读取账号密码
-    
-    支持多种格式：
-        账号：xxx
-        账号:xxx
-        账号=xxx
-        password:xxx
-        password=xxx
-    """
-    try:
-        with open(Config.ACCOUNT_FILE, 'r', encoding='utf-8') as f:
-            lines = f.readlines()
-            if len(lines) < 2:
-                log("账号文件格式错误：至少需要两行（账号和密码）")
-                return None, None
-            
-            # 解析第一行（账号）
-            line1 = lines[0].strip()
-            username = None
-            for prefix in ['账号：', '账号:', '账号=', 'username:', 'username=', 'user:', 'user=']:
-                if line1.startswith(prefix):
-                    username = line1[len(prefix):].strip()
-                    break
-            if not username:
-                # 尝试用冒号或等号分割
-                if ':' in line1:
-                    username = line1.split(':', 1)[1].strip()
-                elif '=' in line1:
-                    username = line1.split('=', 1)[1].strip()
-                else:
-                    username = line1
-            
-            # 解析第二行（密码）
-            line2 = lines[1].strip()
-            password = None
-            for prefix in ['密码：', '密码:', '密码=', 'password:', 'password=', 'pass:', 'pass=']:
-                if line2.startswith(prefix):
-                    password = line2[len(prefix):].strip()
-                    break
-            if not password:
-                # 尝试用冒号或等号分割
-                if ':' in line2:
-                    password = line2.split(':', 1)[1].strip()
-                elif '=' in line2:
-                    password = line2.split('=', 1)[1].strip()
-                else:
-                    password = line2
-            
-            if username and password:
-                log(f"读取到用户名: {username}")
-                return username, password
-            else:
-                log("账号文件格式错误：无法解析用户名或密码")
-                return None, None
-    except Exception as e:
-        log(f"读取账号文件失败: {e}")
-        return None, None
 
 
 # ============ 缺失日期检测 ============
@@ -428,19 +360,28 @@ def _update_spm_from_url(page):
             if extracted_spm and extracted_spm != Config.DMP_SPM:
                 old_spm = Config.DMP_SPM
                 Config.DMP_SPM = extracted_spm
-                log(f"✓ SPM自动更新: {old_spm} -> {Config.DMP_SPM}")
+                log(f"✅ SPM自动更新: {old_spm} -> {Config.DMP_SPM}")
             else:
-                log(f"✓ SPM已是最新，无需更新: {Config.DMP_SPM}")
+                log(f"✅ SPM已是最新，无需更新: {Config.DMP_SPM}")
         else:
             log(f"⚠️ 当前URL未包含spm参数，跳过更新 (URL: {current_url[:80]}...)")
     except Exception as e:
         log(f"⚠️ SPM提取失败: {e}")
 
 
-def check_dmp_session(page):
+def check_dmp_session(page, max_retries: int = 3):
     """
     快速检查达摩盘会话是否仍然有效（避免重复登录触发反爬）
-    
+
+    Sprint 19+ 改造: 增加重试机制，API timeout 不再误判为失效
+    - 业务层 session 验证（isLogin=false → 失效）
+    - API timeout/网络异常 → 重试，不算失效
+    - 3 次 timeout 默认相信 cookie 还在
+
+    Args:
+        page: Playwright 页面对象
+        max_retries: 最大重试次数（默认 3）
+
     Returns:
         bool: True 表示已登录且会话有效，False 表示需要重新登录
     """
@@ -453,21 +394,35 @@ def check_dmp_session(page):
         # 6/11 跑批 0/15 根因: chrome_profile cookie HTTP 200 但业务码失效
         # SPA 检测后不跳顶级 page, 嵌 4 iframe (含千牛登录页), DOM 假阳性
         # 改用 API 验证业务 session: isLogin=false → 强制重登
-        try:
-            api_resp = page.evaluate("""async () => {
-                const r = await fetch('/api_2/login/loginuserinfo?bizCode=dmp', {
-                    credentials: 'include',
-                    headers: { 'Accept': 'application/json' }
-                });
-                const body = await r.json();
-                return { status: r.status, body };
-            }""")
-            is_login = (api_resp or {}).get('body', {}).get('data', {}).get('isLogin', False)
-            if not is_login:
-                log("[会话检测] 业务层 session 失效 (/api_2/login/loginuserinfo isLogin=false), 需要重新登录")
-                return False
-        except Exception as e:
-            log(f"[会话检测] loginuserinfo API 调用异常: {e}, 视为需要重新登录")
+        # 2026-06-13 改造: API timeout 视为不明确结果，重试
+        is_login = None
+        for attempt in range(1, max_retries + 1):
+            try:
+                api_resp = page.evaluate("""async () => {
+                    const r = await fetch('/api_2/login/loginuserinfo?bizCode=dmp', {
+                        credentials: 'include',
+                        headers: { 'Accept': 'application/json' }
+                    });
+                    const body = await r.json();
+                    return { status: r.status, body };
+                }""")
+                is_login = (api_resp or {}).get('body', {}).get('data', {}).get('isLogin', None)
+                if is_login is None:
+                    log(f"[会话检测] 第 {attempt}/{max_retries} 次: API 返回无 isLogin 字段，重试")
+                    page.wait_for_timeout(1000)
+                    continue
+                break  # 拿到明确结果
+            except Exception as e:
+                log(f"[会话检测] 第 {attempt}/{max_retries} 次: API 异常: {e}，重试")
+                page.wait_for_timeout(1000)
+
+        # 3 次都 timeout → 默认相信 cookie 还在（避免误判触发不必要的重登）
+        if is_login is None:
+            log(f"[会话检测] {max_retries} 次 API 调用均无明确结果，默认相信 cookie 有效")
+            return True
+
+        if not is_login:
+            log("[会话检测] 业务层 session 失效 (/api_2/login/loginuserinfo isLogin=false), 需要重新登录")
             return False
 
         # 检测页面是否有"立即登录"按钮（未登录标志）
@@ -475,14 +430,14 @@ def check_dmp_session(page):
         if len(login_btns) > 0:
             log("[会话检测] 检测到未登录（页面有'立即登录'按钮），需要重新登录")
             return False
-        
+
         # 进一步检查：尝试访问资产页面，看是否被重定向到登录
         page_title = page.title() or ""
         if "登录" in page_title:
             log("[会话检测] 检测到登录页（title包含'登录'），需要重新登录")
             return False
-        
-        log("[会话检测] ✓ 会话仍然有效，跳过登录")
+
+        log("[会话检测] ✅ 会话仍然有效，跳过登录")
         return True
     except Exception as e:
         log(f"[会话检测] 检查异常: {e}，视为需要重新登录")
@@ -822,4 +777,4 @@ if __name__ == "__main__":
     log(f"T-2: {format_date_for_csv(datetime.now() - timedelta(days=2))}")
     
     log("=" * 50)
-    log("自检完成 ✓")
+    log("自检完成 ✅")
