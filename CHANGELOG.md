@@ -4,6 +4,50 @@
 
 ---
 
+## [v0.1.31] - 2026-06-16 - fix(flow): append_flow_to_csv 按日期对象去重 (v0.1.14 漏修)
+
+### 背景
+跑批后看 data.csv 状态发现: 6/7~6/14 已按零填充格式 (2026/06/07) 写入, 但历史 2025-08-19 ~ 2026-6-6 是无零填充格式 (2026/6/7). 两种格式共存, 未来重跑 6/7~6/14 会写重复行 (字符串不等 → 旧逻辑不去重).
+
+### Root Cause
+v0.1.14 修 date 格式时只改了 `dmp_item_insight_scraper`, 漏了 `dmp_flow_scraper.append_flow_to_csv`. 旧逻辑 `row.get('date') != date_str` 是字符串比较. `parse_date` 同时支持两种格式 (`%Y/%m/%d` strptime 宽松), 但 `append_flow_to_csv` 没用.
+
+### Fixed
+- **`core/dmp_flow_scraper.py`**: `append_flow_to_csv` 用 `parse_date` 转 date 对象去重比较 (替代字符串比较)
+- **`core/tests/test_dmp_flow_scraper.py`**: 加 2 个 regression test (`_dedup_legacy_unpadded_format` / `_dedup_zero_padded_format`) 防止再犯
+
+### Verified
+- `PYTHONPATH=. pytest core/tests/` → **139/139 passed** (137 + 2 new)
+- ruff check → All checks passed (我改的 5 文件)
+
+### Metadata
+- Related Files: `core/dmp_flow_scraper.py:733-743`, `core/tests/test_dmp_flow_scraper.py`
+- Tests: 139/139 (was 137 + 2 new)
+
+---
+
+## [v0.1.30] - 2026-06-16 - fix(flow): Gate 4 zhiai 末节点误判残缺 (ERR-20260616-006 子 bug)
+
+### 背景
+6/16 23:18 跑批日志显示 scraper 实际拿到 6/7~6/14 8 天真实数据 (xinzeng faxian=171845~1344536), 但被 Gate 4 `_check_partial_flow_rows` 跳过写入, 日志报 "部分人群: zhiai(initial=243,845,非零列=1)". 8/9 天 scraper 实际工作但被 Gate 误杀, data.csv 没更新.
+
+### Root Cause
+zhiai 是末节点 (CRM 阶段最高), 永远只有 `zhuanzhiai` 自循环一列, 这是 DMP 系统性占位, **不是残缺**. Gate 4 旧逻辑 `if non_zero <= 1: 残缺` 没区分末节点, 把 zhiai 误判.
+
+### Fixed
+- **`core/dmp_flow_scraper.py:697-715`**: `_check_partial_flow_rows` 排除 `zhiai` (与 `xinzeng` 同样 skip)
+- **`core/tests/test_dmp_flow_scraper.py`**: 加 `test_gate4_skip_zhiai_terminal_node`, 改 `test_gate4_report_multiple_crowds` 期望从 7 → 6 + 加 zhiai 不应被报断言
+
+### Verified
+- `PYTHONPATH=. pytest core/tests/test_dmp_flow_scraper.py` → 26/26 passed
+- 真实 DMP 跑批后: 6/7~6/14 8/9 天写入 CSV ✓ (T+1 6/15+6/16 数据未成熟跳过, 符合预期)
+
+### Metadata
+- Related Files: `core/dmp_flow_scraper.py`, `core/tests/test_dmp_flow_scraper.py`
+- Tests: 137/137 (passed, 1 新 + 1 期望翻转)
+
+---
+
 ## [v0.1.29] - 2026-06-16 - fix(common): check_dmp_session 反安全 timeout 逻辑 (ERR-20260616-006 子 bug)
 
 ### 背景
