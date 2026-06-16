@@ -430,7 +430,7 @@ def click_xinzeng_tab(page):
                 if (text !== '新增') continue;  // 精确匹配, 避免 '新增流转' 等
                 const rect = el.getBoundingClientRect();
                 if (rect.width === 0 || rect.height === 0) continue;
-                if (rect.left < 200) continue;  // tab 通常在左侧导航栏
+                if (rect.left >= 200) continue;  // tab 通常在左侧导航栏, 右侧元素跳过
                 el.click();
                 return { ok: true, top: rect.top, left: rect.left, text };
             }

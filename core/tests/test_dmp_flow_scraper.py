@@ -262,6 +262,9 @@ def test_click_xinzeng_tab_js_contains_required_matchers() -> None:
     assert "el.click()" in js, "JS 必须调用 el.click()"
     assert "rect.left" in js, "JS 必须用 rect.left 做位置过滤"
     assert "getBoundingClientRect" in js, "JS 必须用 getBoundingClientRect 取位置"
+    # 防退化: 位置过滤语义必须是"右侧跳过, 左侧执行 click"
+    # 之前误写 `rect.left < 200 continue` (左侧跳过, 反逻辑), 已修
+    assert ">= 200" in js, "JS 必须用 '>= 200' 跳过右侧元素 (左侧 tab 才 click)"
 
 
 def test_click_xinzeng_tab_handles_ok_false() -> None:
