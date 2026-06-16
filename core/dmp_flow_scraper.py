@@ -412,6 +412,34 @@ def extract_xinzeng_flow_by_dom(page):
     return result
 
 
+def click_xinzeng_tab(page):
+    """click DMP '新增' tab 触发 SPA transfer API.
+
+    ERR-20260616-006: page.goto + statusId=0 不触发 DMP 后端 transfer API.
+    实测需要先访问其他 tab 建立 SPA 路由上下文, 再 click '新增' tab 才触发.
+    本函数在前置 tab 访问完后调用, 替代 page.goto 访问 xinzeng.
+
+    Returns:
+        dict: {'ok': True/False, 'top': ..., 'left': ..., 'text': ...} 用于诊断日志.
+    """
+    result = page.evaluate("""
+        () => {
+            const allEls = document.querySelectorAll('*');
+            for (const el of allEls) {
+                const text = (el.innerText || el.textContent || '').trim();
+                if (text !== '新增') continue;  // 精确匹配, 避免 '新增流转' 等
+                const rect = el.getBoundingClientRect();
+                if (rect.width === 0 || rect.height === 0) continue;
+                if (rect.left < 200) continue;  // tab 通常在左侧导航栏
+                el.click();
+                return { ok: true, top: rect.top, left: rect.left, text };
+            }
+            return { ok: false };
+        }
+    """)
+    return result
+
+
 def extract_flow_data_by_dom_v3(page, target_date, debug_dir=None):
     """
     API拦截方案：拦截两个API获取流转数据（2026-04-12最终版）
@@ -431,11 +459,11 @@ def extract_flow_data_by_dom_v3(page, target_date, debug_dir=None):
     log(f"  日期逻辑: {start_date_str} 的人群在 {biz_date_str} 的流转")
 
     # 状态ID配置
-    # 2026-06-14 关键修复：xinzeng (statusId=0) 放第一个访问。
-    # 实测 xinzeng transfer API 响应极慢（30s+），先请求它，后面访问其他 tab 时
-    # 响应会异步到达，collector 自然捕获。放最后则永远等不到。
-    all_status_ids = [0, 2001, 2002, 2003, 2004, 2006, 2007, 2008]
-    all_crowd_names = ['新增', '发现', '种草', '互动', '行动', '首购', '复购', '至爱']
+    # 2026-06-16 关键修复 (ERR-20260616-006): xinzeng (statusId=0) 挪到末尾.
+    # 实测 page.goto + statusId=0 不触发 DMP 后端 transfer API, 必须 click '新增' tab.
+    # 前置 7 个 tab 的 page.goto 帮助建立 SPA 路由上下文, 此时再 click '新增' tab 触发 transfer.
+    all_status_ids = [2001, 2002, 2003, 2004, 2006, 2007, 2008, 0]
+    all_crowd_names = ['发现', '种草', '互动', '行动', '首购', '复购', '至爱', '新增']
 
     # 创建API拦截器
     collector = FlowCollectorByAPI()
@@ -468,16 +496,26 @@ def extract_flow_data_by_dom_v3(page, target_date, debug_dir=None):
         if not collected or not collected.get('faxian', {}).get('initial'):
             log("【API方案】首次加载数据不足，尝试逐个tab触发...")
 
-            # 访问全部8个tab（含xinzeng/statusId=0）
+            # 访问全部8个tab. 前7个 page.goto, xinzeng (status_id==0) 用 click (ERR-20260616-006)
             for status_id, crowd_name in zip(all_status_ids, all_crowd_names):
-                tab_url = f"{Config.DMP_BASE_URL}?spm={spm}{route}?statusId={status_id}&startDate={start_date_str}&bizDate={biz_date_str}"
-                page.goto(tab_url, wait_until="domcontentloaded", timeout=60000)
-                time.sleep(2)  # 统一等2秒
+                if status_id == 0:
+                    # click '新增' tab 替代 page.goto. 前置 tab 已建立 SPA 路由上下文.
+                    log("【API方案】click xinzeng ('新增') tab 触发 transfer API...")
+                    click_result = click_xinzeng_tab(page)
+                    log(f"【API方案】click_xinzeng_tab 结果: {click_result}")
+                    if not click_result.get('ok'):
+                        log("⚠️ click_xinzeng_tab 失败 (找不到'新增'tab), 降级到 page.goto")
+                        tab_url = f"{Config.DMP_BASE_URL}?spm={spm}{route}?statusId=0&startDate={start_date_str}&bizDate={biz_date_str}"
+                        page.goto(tab_url, wait_until="domcontentloaded", timeout=60000)
+                    time.sleep(2)
+                else:
+                    tab_url = f"{Config.DMP_BASE_URL}?spm={spm}{route}?statusId={status_id}&startDate={start_date_str}&bizDate={biz_date_str}"
+                    page.goto(tab_url, wait_until="domcontentloaded", timeout=60000)
+                    time.sleep(2)  # 统一等2秒
 
         # 统一等待剩余异步响应，重点等 xinzeng（statusId=0）transfer API
-        # 2026-06-14 关键修复：xinzeng transfer API 响应极慢（实测 30~40s），
-        # 且 page.goto() 会丢弃上一页在途响应。xinzeng 是最后访问的 tab，
-        # 所以必须停留在当前页轮询，不能导航离开。
+        # 2026-06-16 修复 (ERR-20260616-006): xinzeng 改用 click '新增' tab 触发, 不再 page.goto.
+        # 60s 轮询保留 (响应仍然慢 30~40s).
         log("【API方案】等待所有API响应完成（重点等 xinzeng）...")
         max_wait = 60
         for attempt in range(max_wait):
@@ -489,18 +527,23 @@ def extract_flow_data_by_dom_v3(page, target_date, debug_dir=None):
         collected = collector.get_data()
         log(f"【API方案】最终收集到的数据: {collected}")
 
-        # xinzeng API 兜底：如果上面 60s 还没拿到，再尝试重新访问 xinzeng tab
+        # xinzeng API 兜底：如果上面 60s 还没拿到，再尝试 click '新增' tab (ERR-20260616-006)
         if not collected.get('xinzeng', {}).get('faxian'):
-            xinzeng_url = f"{Config.DMP_BASE_URL}?spm={spm}{route}?statusId=0&startDate={start_date_str}&bizDate={biz_date_str}"
-            log(f"[API] xinzeng flow仍为空，重新访问 xinzeng tab: {xinzeng_url}")
-            page.goto(xinzeng_url, wait_until="domcontentloaded", timeout=60000)
+            log("[API] xinzeng flow仍为空，重新 click xinzeng ('新增') tab...")
+            click_result = click_xinzeng_tab(page)
+            log(f"[API] click_xinzeng_tab 兜底结果: {click_result}")
+            if not click_result.get('ok'):
+                log("⚠️ click_xinzeng_tab 兜底失败 (找不到'新增'tab), 降级到 page.goto")
+                xinzeng_url = f"{Config.DMP_BASE_URL}?spm={spm}{route}?statusId=0&startDate={start_date_str}&bizDate={biz_date_str}"
+                log(f"[API] 降级访问 xinzeng tab: {xinzeng_url}")
+                page.goto(xinzeng_url, wait_until="domcontentloaded", timeout=60000)
 
             max_wait = 45
             for attempt in range(max_wait):
                 time.sleep(1)
                 collected = collector.get_data()
                 if collected.get('xinzeng', {}).get('faxian'):
-                    log(f"[API] xinzeng 在重新访问后 {attempt + 1}s 拿到数据")
+                    log(f"[API] xinzeng 在重新 click 后 {attempt + 1}s 拿到数据")
                     break
             collected = collector.get_data()
             log(f"[API] xinzeng after retry: {collected.get('xinzeng')}")

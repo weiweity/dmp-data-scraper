@@ -426,23 +426,43 @@ sorted(dates)  # ['2026/5/1', '2026/5/10', '2026/5/11', ...'2026/5/19', '2026/5/
 
 ---
 
-## [ERR-20260616-006] xinzeng API 需 click 触发 (TODO, 未修)
+## [ERR-20260616-006] xinzeng API 需 click 触发 (fix on branch, 待真实 DMP 验证)
 
 **Logged**: 2026-06-16T22:15:00Z
 **Priority**: high
-**Status**: open (需要交互式调试)
+**Status**: in-progress (fix on branch `fix/xinzeng-click-2026-06-16`, 待真实 DMP 验证)
 **Area**: scraper/dmp-spa
 
 ### Summary
 用户报告: xinzeng (statusId=0) DMP API 只在"先随机点一个 tab, 再点 xinzeng tab"时触发. page.goto + statusId=0 不触发. 待验证.
 
-### TODO
-1. 加临时日志看 xinzeng tab 是否在 page.goto 后真的渲染了 sankey 图
-2. 试试 click(`[id^="deeplink-tab-xinzeng"]` 或类似) 替代 page.goto
-3. 验证修复后 6/13+ 数据是否恢复正常 (不只是 self)
+### Root Cause (代码侧分析, 待真实 DMP 确认)
+DMP 是 SPA 应用. `page.goto + statusId=0` 是"裸 URL 访问", SPA 路由上下文未建立 (其他 statusId 是 SPA 已激活状态下的 navigate, 触发 DMP 后端 transfer API; statusId=0 是 SPA 初始状态, 后端不返回 transfer 数据). 需要先访问其他 7 个 tab 建立 SPA 上下文, 再 click '新增' tab 触发 transfer.
+
+### Fix (方案 B: xinzeng click 化 + tab 顺序倒置)
+1. **新增** `click_xinzeng_tab(page)` (`core/dmp_flow_scraper.py:415-441`): evaluate 找含 '新增' 文字 + 可点击 + 左侧的 DOM 元素, 调用 `el.click()`. 返回 `{ok, top, left, text}` 供诊断日志.
+2. **改** `all_status_ids`: `[0, 2001, ...]` → `[2001, ..., 0]` (xinzeng 挪末尾, 让前置 7 个 page.goto 建立 SPA 上下文)
+3. **改** 主循环 (`core/dmp_flow_scraper.py:498-518`): xinzeng 改用 click_xinzeng_tab, 找不到时降级 page.goto
+4. **改** 兜底 (`core/dmp_flow_scraper.py:528-548`): 60s 轮询失败时, click_xinzeng_tab 重试, 仍失败降级 page.goto + DOM fallback
+5. **加** 4 个 regression test (`core/tests/test_dmp_flow_scraper.py`):
+   - `test_click_xinzeng_tab_returns_evaluate_result_verbatim` (返回值透传)
+   - `test_click_xinzeng_tab_passes_js_to_evaluate` (page.evaluate 调用契约)
+   - `test_click_xinzeng_tab_js_contains_required_matchers` (JS 防退化: '新增' 文字 + el.click() + rect.left 过滤)
+   - `test_click_xinzeng_tab_handles_ok_false` (找不到时返回 {ok: False}, 不抛异常)
+
+### TODO (验证后)
+1. 真实 DMP 跑批: 跑一天 (建议 T_OFFSET=2 跑 6/14), 看 [API] click_xinzeng_tab 结果日志 + xinzeng faxian 是否非零
+2. 验证通过后回填 6/7~6/15 (连续 9 天缺失)
+3. 跑 `BACKFILL_DAYS=9 ./run.sh -f` 或类似命令
+
+### Verified (单元测试层)
+- `PYTHONPATH=. pytest core/tests/` → **136/136 passed** (132 旧 + 4 新)
+- `ruff check core/dmp_flow_scraper.py core/tests/test_dmp_flow_scraper.py` → All checks passed
 
 ### Metadata
-- Related Files: `core/dmp_flow_scraper.py:472-474` (page.goto xinzeng tab)
+- Related Files: `core/dmp_flow_scraper.py:415-441 (click_xinzeng_tab), 462-466 (status ids), 498-518 (主循环), 528-548 (兜底)`, `core/tests/test_dmp_flow_scraper.py:217-272`
+- Tests: 136/136 (was 132 + 4 new)
+- Branch: `fix/xinzeng-click-2026-06-16`
 
 ### Metadata
 - Related Files: core/dmp_scraper.py

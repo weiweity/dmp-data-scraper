@@ -213,3 +213,63 @@ def test_is_flow_data_stale_self_only_stale_returns_true() -> None:
     data["faxian"]["initial"] = 11000601
     data["faxian"]["faxian"] = 11000601  # self == initial, 没跨阶段流转
     assert is_flow_data_stale(data) is True
+
+
+# ========== click_xinzeng_tab (ERR-20260616-006) ==========
+
+from unittest.mock import MagicMock
+
+from core.dmp_flow_scraper import click_xinzeng_tab
+
+
+def test_click_xinzeng_tab_returns_evaluate_result_verbatim() -> None:
+    """click_xinzeng_tab: 返回值 = page.evaluate() 的结果 (透传)."""
+    page = MagicMock()
+    page.evaluate.return_value = {"ok": True, "top": 120, "left": 50, "text": "新增"}
+
+    result = click_xinzeng_tab(page)
+
+    assert result == {"ok": True, "top": 120, "left": 50, "text": "新增"}
+    assert page.evaluate.call_count == 1
+
+
+def test_click_xinzeng_tab_passes_js_to_evaluate() -> None:
+    """click_xinzeng_tab: 调用 page.evaluate 时传入 JS 字符串 (非 callable)."""
+    page = MagicMock()
+    page.evaluate.return_value = {"ok": False}
+
+    click_xinzeng_tab(page)
+
+    # 验证传入 page.evaluate 的是 str (Playwright 接受 str 或 callable)
+    js_arg = page.evaluate.call_args[0][0]
+    assert isinstance(js_arg, str)
+    assert len(js_arg) > 50  # 防止 JS 被误删成空
+
+
+def test_click_xinzeng_tab_js_contains_required_matchers() -> None:
+    """click_xinzeng_tab: JS 必须含 '新增' 文字匹配 + click() 调用 + 位置过滤.
+
+    防退化: 未来 PR 简化 JS 时可能误删过滤条件, 导致点击错误元素或点击 '新增流转' 等.
+    """
+    page = MagicMock()
+    page.evaluate.return_value = {"ok": False}
+
+    click_xinzeng_tab(page)
+    js = page.evaluate.call_args[0][0]
+
+    # 必须含核心选择逻辑
+    assert "'新增'" in js or '"新增"' in js, "JS 必须精确匹配 '新增' 文字"
+    assert "el.click()" in js, "JS 必须调用 el.click()"
+    assert "rect.left" in js, "JS 必须用 rect.left 做位置过滤"
+    assert "getBoundingClientRect" in js, "JS 必须用 getBoundingClientRect 取位置"
+
+
+def test_click_xinzeng_tab_handles_ok_false() -> None:
+    """click_xinzeng_tab: 找不到 '新增' tab 时返回 {ok: False}, 不抛异常."""
+    page = MagicMock()
+    page.evaluate.return_value = {"ok": False}
+
+    result = click_xinzeng_tab(page)
+
+    assert result == {"ok": False}
+    # 不重试 / 不抛异常 (调用方负责降级到 page.goto)
