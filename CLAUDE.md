@@ -333,7 +333,7 @@ print(f"Missing: {[d.isoformat() for d in missing]}")
 
 | 问题 | 为何跳过 | 重启时机 |
 |------|---------|---------|
-| `dmp_item_insight_scraper.py` 2565 行单文件拆 (CLAUDE.md 写 3246 已过期) | 业务逻辑+DOM+日期+存储全纠缠, 拆错一个函数可能让 0/60 重现. 不知道每个函数的实际调用链. | 拆之前必须先写完整单测覆盖. 当前 128 测试不足以覆盖 2565 行. (2026-06-16 wc -l 验证实际 2565 行, CLAUDE.md §11 行数过期) |
+| `dmp_item_insight_scraper.py` 2565 行单文件拆 (CLAUDE.md 写 3246 已过期) | 业务逻辑+DOM+日期+存储全纠缠, 拆错一个函数可能让 0/60 重现. 不知道每个函数的实际调用链. | ✅ **部分完成** (2026-06-16): `core/validators/items_validators.py` 已拆出 5 Gate 函数 (validate_item_data / validate_cross_day / _check_api_health / _detect_copy_day / _check_business_smoothness + send_lark_alert) + `core/tests/test_validators/test_items_validators.py` 8+ 测试. **但 dmp_item_insight_scraper.py 还有重复定义 (lines 1639-2128), 未启用 items_validators**. 完整启用需把 append_tocsv 签名从 (csv_file, data) 改成 (row, prev_row), 调用方先读 CSV 再传 dict — 风险高 (改 append_tocsv 是 P0 写路径). **重启时机**: append_tocsv 单元测试覆盖率 ≥ 80% 后, 单 PR 启用 |
 | 异常处理 4 种风格统一 (log-only / log+return / log+raise / bare pass) | `except: pass` 在某处可能是 best-effort cleanup (e.g., 关闭浏览器 IO 失败). 改 log 反而引入新失败. 猜不出哪些是故意的. | ✅ **已建标准 (§12)** (2026-06-16): 不批量改, 但建立 4 风格决策表 + 观察期触发条件. 单点 fix 仍走 §0 流程 |
 | 三模块 retry 策略统一 (items 60s / assets 10-14-18s / flow 无) | 不懂哪种对业务最合理. 改错会让抓批更不稳定. | ✅ **已建标准 (§12)** (2026-06-16): 文档化现状 + 各模块"何时该 retry"决策表. 跑批观察期触发条件. |
 | `chrome_profile` basename vs 全路径混用 (`os.path.basename(self.config_obj.USER_DATA_DIR)`) | 可能是为了拿字符串当 folder name (Playwright 接受相对路径), 改成全路径可能错. 猜不到原意. | ✅ **已清** (2026-06-16 commit 7aec1e6): USING_COMMON=False 分支删除后, ConfigAdapter 的 get('paths')/get('browser') 也成为死代码, 顺手删 os.path.basename 死调用 |
