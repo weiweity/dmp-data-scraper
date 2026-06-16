@@ -333,9 +333,9 @@ print(f"Missing: {[d.isoformat() for d in missing]}")
 
 | 问题 | 为何跳过 | 重启时机 |
 |------|---------|---------|
-| `dmp_item_insight_scraper.py` 2565 行单文件拆 (CLAUDE.md 写 3246 已过期) | 业务逻辑+DOM+日期+存储全纠缠, 拆错一个函数可能让 0/60 重现. 不知道每个函数的实际调用链. | 拆之前必须先写完整单测覆盖. 当前 128 测试不足以覆盖 2565 行. (2026-06-16 wc -l 验证实际 2565 行, CLAUDE.md §11 行数过期) |
-| 异常处理 4 种风格统一 (log-only / log+return / log+raise / bare pass) | `except: pass` 在某处可能是 best-effort cleanup (e.g., 关闭浏览器 IO 失败). 改 log 反而引入新失败. 猜不出哪些是故意的. | 跑批时观察: 如果发现某个异常被吞掉导致后续崩溃, 单独 fix, 不批量统一. |
-| 三模块 retry 策略统一 (items 60s / assets 10-14-18s / flow 无) | 不懂哪种对业务最合理. 改错会让抓批更不稳定. | 让用户讲清每模块的"应该跑多久", 我才能调. |
+| `dmp_item_insight_scraper.py` 2565 行单文件拆 (CLAUDE.md 写 3246 已过期) | 业务逻辑+DOM+日期+存储全纠缠, 拆错一个函数可能让 0/60 重现. 不知道每个函数的实际调用链. | ✅ **部分完成** (2026-06-16): `core/validators/items_validators.py` 已拆出 5 Gate 函数 (validate_item_data / validate_cross_day / _check_api_health / _detect_copy_day / _check_business_smoothness + send_lark_alert) + `core/tests/test_validators/test_items_validators.py` 8+ 测试. **但 dmp_item_insight_scraper.py 还有重复定义 (lines 1639-2128), 未启用 items_validators**. 完整启用需把 append_tocsv 签名从 (csv_file, data) 改成 (row, prev_row), 调用方先读 CSV 再传 dict — 风险高 (改 append_tocsv 是 P0 写路径). **重启时机**: append_tocsv 单元测试覆盖率 ≥ 80% 后, 单 PR 启用 |
+| 异常处理 4 种风格统一 (log-only / log+return / log+raise / bare pass) | `except: pass` 在某处可能是 best-effort cleanup (e.g., 关闭浏览器 IO 失败). 改 log 反而引入新失败. 猜不出哪些是故意的. | ✅ **已建标准 (§12)** (2026-06-16): 不批量改, 但建立 4 风格决策表 + 观察期触发条件. 单点 fix 仍走 §0 流程 |
+| 三模块 retry 策略统一 (items 60s / assets 10-14-18s / flow 无) | 不懂哪种对业务最合理. 改错会让抓批更不稳定. | ✅ **已建标准 (§12)** (2026-06-16): 文档化现状 + 各模块"何时该 retry"决策表. 跑批观察期触发条件. |
 | `chrome_profile` basename vs 全路径混用 (`os.path.basename(self.config_obj.USER_DATA_DIR)`) | 可能是为了拿字符串当 folder name (Playwright 接受相对路径), 改成全路径可能错. 猜不到原意. | ✅ **已清** (2026-06-16 commit 7aec1e6): USING_COMMON=False 分支删除后, ConfigAdapter 的 get('paths')/get('browser') 也成为死代码, 顺手删 os.path.basename 死调用 |
 | `_parse_date` / `_read_prev_row` 0 调用 (在 items_validators.py) | v0.1.16 已删. sanity_check.py 还在用 (3 调用), 不动. | ✅ **已清** (2026-06-16 commit 7b54989): 删 `_parse_date` 死 re-export, sanity_check.py 用自己的定义 (3 调用保留) |
 | 4 处 bare `except: pass` (dmp_common:56, 71 / log.py:18, 29) | 同上, 可能是 best-effort cleanup. 不知道. | ✅ **已清** (2026-06-16 commit 6867dfa): 加 print 警告 (throttle 50 次一次避免刷屏). best-effort 语义保留, 但 silent fail → visible |
@@ -344,4 +344,41 @@ print(f"Missing: {[d.isoformat() for d in missing]}")
 
 ---
 
-*此文件由 AI 维护, 最后更新 2026-06-16 (Tech debt §11 P2 第 1/2/3/4 件清完: bare except + _parse_date + USING_COMTERN + chrome_profile basename. 剩 4 件: 大文件拆 / 异常处理 / retry 策略 / SPM 硬编码)*
+## 12. 异常处理 + Retry 策略 标准 (2026-06-16 新增, §11 P2 第 2/3 件已建标准)
+
+### 12.1 异常处理 4 风格决策表
+
+| 风格 | 适用场景 | 示例 |
+|------|---------|------|
+| `log-only` (log + pass) | 真正 best-effort cleanup: 失败不影响主流程, 仅影响日志可观察性 | `os.makedirs(LOG_DIR, exist_ok=True)` 模块 init (dmp_common:55), `log()` 文件写 (dmp_common:70, utils/log.py:29), `BrowserManager.__exit__` 双重 close (dmp_common:336-342) |
+| `log + return None/False` | 抓取失败但上层有 retry/兜底: 函数返回 falsy 让 caller 决定下一步 | `detect_encoding` (dmp_common:80), `read_account` 失败 (dmp_common:229), `_load_completed_items` 缓存读失败 (dmp_item_insight_scraper.py), `login_qianniu` 子步骤失败 (dmp_common:518-527, 679-680) |
+| `log + raise` (or re-raise) | 数据完整性 / 业务不变量被破坏, 必须让 caller 知道 | `validate_item_data` 返回 (False, reason) 但 caller 仍 raise (append_tocsv), 配置文件 YAML 解析失败 (items_validators.py:96-109) |
+| `bare pass` (no log) | **禁止**: 任何 silent fail 都难追. 2026-06-16 commit 6867dfa 已把 4 处典型 (`os.makedirs` / `log()`) 改成 log + throttle warning | — |
+
+**何时打破规则**:
+- 跑批发现某异常被吞掉导致后续崩溃 → 单点 fix (走 §0 Git 流程), 不要批量统一
+- 新代码默认 `log + raise`, 除非确认是 best-effort cleanup 才用 `log + return`
+
+### 12.2 Retry 策略 (各模块现状)
+
+| 模块 | 当前策略 | 触发条件 | max wait |
+|------|---------|---------|----------|
+| **assets** (`dmp_scraper.py:332-338`) | 固定次数重试 + 递增等待 | `non_zero_count < 3` (有效数据 < 3) | 10s + 14s + 18s = **42s 总** |
+| **items** (`dmp_item_insight_scraper.py:518-627`) | 3 阶段轮询 (无固定 retry count) | Phase 1: 12s 内 API 不响应; Fallback: 10s; Phase 2: ~24s (max_attempts=12, delay=1.5-2.5s) | **~46s 总** (但不重试, 一次性轮询) |
+| **flow** (`dmp_flow_scraper.py`) | **无 retry**, 一次性抓取 | N/A | N/A |
+
+**何时打破规则**:
+- 跑批发现某模块频繁超时 → 单点调对应模块的 max_wait / retry count
+- 切忌: 把 assets 的 42s 改成 items 的 46s, 或反向. 每模块业务不同 (资产诊断 / 单品洞察 / 流转数据)
+
+### 12.3 观察期触发条件 (未来 fix 触发)
+
+如果以下任一条件命中, 单独 fix 对应模块:
+
+1. **异常被吞掉导致数据错乱**: `log-only` 实例中某个实际导致数据写入异常 → 单点改 `log + raise`
+2. **某模块跑批成功率 < 90%**: 检查对应模块 retry 策略是否够 (assets 90% < → 考虑加 retry 4 次)
+3. **某模块超时太频繁 (> 5% run 失败)**: 考虑放宽 max_wait
+
+---
+
+*此文件由 AI 维护, 最后更新 2026-06-16 (Tech debt §11 P2 第 1/2/3/4 件清完: bare except + _parse_date + USING_COMTERN + chrome_profile basename. 第 2/3 件建标准 (§12). 剩 3 件: 大文件拆 / SPM 硬编码)*
