@@ -4,6 +4,51 @@
 
 ---
 
+## [v0.1.25] - 2026-06-16 - fix(flow): 加 Gate 4 残缺数据检测 (Detail 3+4, T+2 缺失兜底)
+
+### 背景
+调研 `data.csv` 时发现 6/14+ 的流转数据大部分字段为 0 (仅 self-transfer 捕获),
+推测 DMP transfer API 在 6/13+ 只返回 self 1 个 item, 不返回完整桑基图。
+此前 `is_flow_data_stale()` (self==initial 全 0 → stale) 和 Gate 3 (实质相同)
+都拦不住这种"残缺但不一致"的数据, 结果 6/14/6/15 写入残缺数据但用户不知情。
+
+### Added
+- **core/dmp_flow_scraper.py**:
+  - `_FLOW_TRANSFER_FIELDS` 常量: 7 个 zhuan* 列 (排除 initial)
+  - `_to_int(v)` 模块级 helper: 解析逗号格式 / 空值 / None → int
+  - `_check_partial_flow_rows(new_rows)`: Gate 4 纯函数, 返回残缺人群描述列表
+    - 阈值: initial > 0 且 非零流转列 ≤ 1 (只有 self 或全 0) → 视为残缺
+    - xinzeng 不参与 (initial=0 是常态)
+  - Gate 4 调用点: `append_flow_to_csv` Gate 3 之后, 写之前
+    - 残缺时 `return True` 跳过整日写入, 日志: `⚠️ 流转 {date_str} 未抓取到, 跳过写入 (部分人群: ...)`
+    - 覆盖 Detail 4 (T+2 缺失) + Detail 3 (部分残缺) 两场景
+
+- **core/tests/test_dmp_flow_scraper.py** (15 tests, 新文件):
+  - `_to_int`: 5 tests (基础 / 逗号 / 空 / int 透传 / 负数)
+  - `_check_partial_flow_rows` Gate 4: 9 tests
+    - pass: 5 非零列 / 3 非零列
+    - fail: 只有 self / 全 0
+    - skip: xinzeng / initial=0
+    - 聚合: 多人群报告 / 混合 pass+fail
+  - `_FLOW_TRANSFER_FIELDS`: 1 test (长度 7, 不含 initial/xinzeng)
+
+### 验证
+- `PYTHONPATH=. pytest core/tests/ -q` → **128/128 passed** (113 旧 + 15 新)
+- `ruff check core/tests/test_dmp_flow_scraper.py` → All checks passed
+- 6/14/6/15 残缺数据再跑会触发 Gate 4 跳过, 不再写"假"完整数据
+
+### Lesson
+- 不要写 ad-hoc 数据分析时, 才发现"G 缺数据"——本应在写入前防御 (Gate 4)
+- 防御性 Gate 应**纯函数化**便于测试, 即使 caller 是 IO-bound `append_flow_to_csv`
+- "Detail 1 (URL 修复)" 假设验证后撤回: URL `?spm=xxx#!/deeplink/flow?statusId=...`
+  是 hash-bang SPA 标准模式, 跨文件一致, 不是 bug. 真正根因在 DMP 后端.
+
+### Metadata
+- Related Files: `core/dmp_flow_scraper.py`, `core/tests/test_dmp_flow_scraper.py`
+- Net diff: 2 files, +131/-0 行 (含 15 测试)
+
+---
+
 ## [v0.1.24] - 2026-06-14 - chore(items): 删 3 个死函数 + 修 1 个测试预存债
 
 ### 背景
