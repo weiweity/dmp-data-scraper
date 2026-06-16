@@ -6,21 +6,22 @@
 """
 
 import csv
-import time
 import os
 import re
+import time
 from datetime import timedelta
 
-# 尝试导入公共模块
-try:
-    from dmp_common import (
-        log, Config, BrowserManager, login_qianniu,
-        detect_encoding, format_date_for_csv,
-        get_missing_dates_flow
-    )
-    USING_COMMON = True
-except ImportError:
-    USING_COMMON = False
+# 导入公共模块 (绝对 import, 跟 dmp_master.py 模式一致, 同时支持脚本 + 包模式)
+from core.dmp_common import (
+    BrowserManager,
+    Config,
+    detect_encoding,
+    format_date_for_csv,
+    get_missing_dates_flow,
+    log,
+    login_qianniu,
+    read_account,
+)
 
 # statusId → crowd key 映射
 STATUS_TO_KEY = {
@@ -560,14 +561,14 @@ def extract_flow_data_by_dom_v3(page, target_date, debug_dir=None):
 
 def fetch_flow_data_for_single_date(page, target_date):
     """兼容旧接口，内部调用新的V4 DOM方案"""
-    debug_dir = Config.DEBUG_DIR if USING_COMMON else "del"
+    debug_dir = Config.DEBUG_DIR
     flow_data = extract_flow_data_by_dom_v3(page, target_date, debug_dir)
     if flow_data:
         # 过滤陈旧数据：数据没更新就不写入
         if is_flow_data_stale(flow_data):
             log(f"[{target_date}] 流转数据未更新（陈旧），跳过写入")
             return "stale"
-        date_str = format_date_for_csv(target_date) if USING_COMMON else target_date.strftime('%Y/%m/%d')
+        date_str = format_date_for_csv(target_date)
         append_flow_to_csv(Config.FLOW_DATA_FILE, date_str, flow_data)
         return True
     return False
@@ -675,7 +676,7 @@ def append_flow_to_csv(csv_file, date_str, flow_data):
         return int(str(v).replace(',', '').strip()) if str(v).strip() else 0
 
     existing_rows = []
-    encoding = detect_encoding(csv_file) if USING_COMMON else 'utf-8'
+    encoding = detect_encoding(csv_file)
 
     if os.path.exists(csv_file):
         with open(csv_file, 'r', encoding=encoding) as f:
@@ -774,17 +775,7 @@ def fetch_flow_data_for_dates(page, dates):
 
 def get_flow_missing_dates(csv_file):
     """获取流转数据需要补齐的日期列表"""
-    if USING_COMMON:
-        return get_missing_dates_flow(csv_file)
-    return []
-
-
-def login_qianniu(page, username, password):
-    """千牛/淘宝登录（公共模块版）"""
-    if USING_COMMON:
-        return login_qianniu(page, username, password, debug_name="flow_login")
-    log("错误：dmp_common 未导入，无法登录")
-    return False
+    return get_missing_dates_flow(csv_file)
 
 
 def main():
@@ -792,26 +783,22 @@ def main():
     log("=" * 50)
     log("达摩盘流转数据抓取工具启动")
     log("=" * 50)
-    username, password = ("guest", "guest")  # placeholder
-    if USING_COMMON:
-        from dmp_common import read_account
-        username, password = read_account()
+    username, password = read_account()
     log("使用URL参数化方案V2抓取流转数据")
 
-    if USING_COMMON:
-        with BrowserManager(headless=False) as browser:
-            page = browser.new_page()
-            page.set_viewport_size({'width': 1920, 'height': 1080})
-            try:
-                login_qianniu(page, username, password)
-                missing_dates = get_missing_dates_flow(Config.FLOW_DATA_FILE)
-                if missing_dates:
-                    success_count = fetch_flow_data_for_dates(page, missing_dates)
-                    log(f"流转数据抓取完成: 成功 {success_count}/{len(missing_dates)}")
-                else:
-                    log("流转数据已是最新，无需补齐")
-            except Exception as e:
-                log(f"运行出错: {e}")
+    with BrowserManager(headless=False) as browser:
+        page = browser.new_page()
+        page.set_viewport_size({'width': 1920, 'height': 1080})
+        try:
+            login_qianniu(page, username, password, debug_name="flow_login")
+            missing_dates = get_missing_dates_flow(Config.FLOW_DATA_FILE)
+            if missing_dates:
+                success_count = fetch_flow_data_for_dates(page, missing_dates)
+                log(f"流转数据抓取完成: 成功 {success_count}/{len(missing_dates)}")
+            else:
+                log("流转数据已是最新，无需补齐")
+        except Exception as e:
+            log(f"运行出错: {e}")
     return True
 
 

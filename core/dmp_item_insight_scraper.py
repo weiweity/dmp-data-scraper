@@ -9,11 +9,11 @@
 
 import csv
 import json
-import time
 import os
-import sys
-import re
 import random
+import re
+import sys
+import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -25,10 +25,7 @@ except ImportError:
 
 # 导入反检测模块
 try:
-    from anti_detect import (
-        human_delay, human_delay_normal, human_scroll,
-        apply_anti_detect, RateLimiter
-    )
+    from anti_detect import RateLimiter, apply_anti_detect, human_delay, human_delay_normal, human_scroll
     HAS_ANTI_DETECT = True
 except ImportError:
     HAS_ANTI_DETECT = False
@@ -92,7 +89,7 @@ def load_config():
             'account_file': 'account.txt',
         }
     }
-    
+
     if config_path.exists():
         try:
             with open(config_path, 'r', encoding='utf-8') as f:
@@ -107,16 +104,16 @@ def load_config():
             _simple_log(f"已从配置文件加载: {config_path}")
         except Exception as e:
             _simple_log(f"加载配置文件失败，使用默认配置: {e}")
-    
+
     return default_config
 
 
 def _get_min_valid_total_for_item(item_id):
     """从配置文件读取指定商品的benchmark过滤阈值
-    
+
     Args:
         item_id: 商品ID（字符串）
-    
+
     Returns:
         int: 最小有效资产总量阈值（未配置时返回默认值20000）
     """
@@ -131,120 +128,61 @@ def _get_min_valid_total_for_item(item_id):
     except Exception:
         return 20000  # 读取失败时使用默认值
 
-# 尝试导入公共模块
-try:
-    from dmp_common import (
-        log, Config, BrowserManager, read_account, login_qianniu,
-        detect_encoding, format_date_for_csv,
-        get_missing_dates_item
-    )
-    USING_COMMON = True
-    
-    # 使用公共模块的配置 - 创建配置适配器
-    class ConfigAdapter:
-        """适配器类，使Config类可以像字典一样使用"""
-        def __init__(self):
-            self.config_obj = Config()
-            
-        def get(self, key, default=None):
-            """模拟字典的get方法"""
-            # 特殊处理某些键
-            if key == 'items':
-                return self.config_obj.ITEM_IDS
-            elif key == 'paths':
-                return {
-                    'item_data_file': os.path.basename(self.config_obj.ITEM_DATA_FILE),
-                    'debug_dir': os.path.basename(self.config_obj.DEBUG_DIR),
-                    'account_file': os.path.basename(self.config_obj.ACCOUNT_FILE)
-                }
-            elif key == 'browser':
-                return {
-                    'user_data_dir': os.path.basename(self.config_obj.USER_DATA_DIR)
-                }
-            elif key == 'anti_detect':
-                # 提供默认的反检测配置
-                return {
-                    'page_load_delay_min': 2,
-                    'page_load_delay_max': 4,
-                    'data_refresh_delay_min': 1.5,
-                    'data_refresh_delay_max': 2.5,
-                    'date_picker_delay_min': 1,
-                    'date_picker_delay_max': 2,
-                    'max_items_per_run': 5,
-                    'item_delay_min': 10,
-                    'item_delay_max': 30,
-                    'max_requests_per_day': 50
-                }
-            else:
-                return default
-    
-    CONFIG = ConfigAdapter()
-    
-    # 公共模块模式下的变量设置
-    config_obj = Config()
-    _SCRIPT_DIR = Path(__file__).parent.resolve()
-    
-    # 设置文件路径（与独立模式保持一致）
-    DATA_FILE = config_obj.ITEM_DATA_FILE
-    DEBUG_DIR = config_obj.DEBUG_DIR
-    USER_DATA_DIR = config_obj.USER_DATA_DIR
-    ACCOUNT_FILE = config_obj.ACCOUNT_FILE
-    
-    # 商品ID列表
-    ITEM_IDS = config_obj.ITEM_IDS
-    
-except ImportError:
-    USING_COMMON = False
-    
-    # 独立模式：加载YAML配置
-    CONFIG = load_config()
-    
-    # 获取脚本所在目录（跨平台）
-    _SCRIPT_DIR = Path(__file__).parent.resolve()
-    
-    # 从配置读取路径
-    DATA_FILE = str(_SCRIPT_DIR / CONFIG['paths']['item_data_file'])
-    DEBUG_DIR = str(_SCRIPT_DIR / CONFIG['paths']['debug_dir'])
-    USER_DATA_DIR = str(_SCRIPT_DIR / CONFIG['browser']['user_data_dir'])
-    ACCOUNT_FILE = str(_SCRIPT_DIR / CONFIG['paths']['account_file'])
-    
-    # 从配置读取商品ID列表
-    ITEM_IDS = CONFIG['items']
-    
-    def log(msg):
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        print(f"[{now}] {msg}")
-    
-    def detect_encoding(file_path):
-        encodings = ['utf-8', 'gbk', 'gb2312', 'gb18030']
-        for encoding in encodings:
-            try:
-                with open(file_path, 'r', encoding=encoding) as f:
-                    f.read(1024)
-                return encoding
-            except Exception:
-                continue
-        return 'utf-8'
-    
-    def read_account():
-        try:
-            with open(ACCOUNT_FILE, 'r', encoding='utf-8') as f:
-                lines = f.readlines()
-                username = lines[0].strip().replace('账号：', '')
-                password = lines[1].strip().replace('密码：', '')
-                log(f"读取到用户名: {username}")
-                return username, password
-        except Exception as e:
-            log(f"读取账号文件失败: {e}")
-            return None, None
-    
-    def format_date_for_csv(dt):
-        # 2026-06-13 改造（ERR-20260613-003）：保留前导零 (YYYY/MM/DD)
-        # 旧版 f"{dt.year}/{dt.month}/{dt.day}" 产生 '2026/5/21'，
-        # 字符串排序错乱（'2026/5/9' > '2026/5/10'），见 ERR-20260613-003
-        return dt.strftime('%Y/%m/%d')
-    
-    # parse_number 和 get_missing_dates 使用全局版本（见下方）
+# 导入公共模块 (绝对 import, 同时支持脚本 + 包模式)
+from core.dmp_common import (
+    BrowserManager,
+    Config,
+    detect_encoding,
+    format_date_for_csv,
+    get_missing_dates_item,
+    log,
+    login_qianniu,
+    read_account,
+)
+
+
+# 使用公共模块的配置 - 创建配置适配器
+class ConfigAdapter:
+    """适配器类，使Config类可以像字典一样使用"""
+    def __init__(self):
+        self.config_obj = Config()
+
+    def get(self, key, default=None):
+        """模拟字典的get方法"""
+        # 特殊处理某些键
+        if key == 'items':
+            return self.config_obj.ITEM_IDS
+        elif key == 'anti_detect':
+            # 提供默认的反检测配置
+            return {
+                'page_load_delay_min': 2,
+                'page_load_delay_max': 4,
+                'data_refresh_delay_min': 1.5,
+                'data_refresh_delay_max': 2.5,
+                'date_picker_delay_min': 1,
+                'date_picker_delay_max': 2,
+                'max_items_per_run': 5,
+                'item_delay_min': 10,
+                'item_delay_max': 30,
+                'max_requests_per_day': 50
+            }
+        else:
+            return default
+
+CONFIG = ConfigAdapter()
+
+# 公共模块模式下的变量设置
+config_obj = Config()
+_SCRIPT_DIR = Path(__file__).parent.resolve()
+
+# 设置文件路径（与独立模式保持一致）
+DATA_FILE = config_obj.ITEM_DATA_FILE
+DEBUG_DIR = config_obj.DEBUG_DIR
+USER_DATA_DIR = config_obj.USER_DATA_DIR
+ACCOUNT_FILE = config_obj.ACCOUNT_FILE
+
+# 商品ID列表
+ITEM_IDS = config_obj.ITEM_IDS
 
 
 def get_target_dates():
@@ -257,17 +195,17 @@ def get_target_dates():
 
 def get_missing_dates(csv_file, item_ids, days_to_check=7):
     """分析CSV文件，找出每个商品ID欠缺的日期
-    
+
     Args:
         csv_file: CSV文件路径
         item_ids: 商品ID列表
         days_to_check: 检查最近多少天的数据
-    
+
     Returns:
         dict: {item_id: [date1, date2, ...]} 需要补抓的日期列表
     """
     from datetime import datetime, timedelta
-    
+
     # 生成最近N天的日期列表
     # T+2 保护: 跳过今天、昨天、前天(i=0,1,2), 达摩盘单品数据 T+2 滞后,
     # 抓'今天/昨天'会拿到更早的复制数据。从 3 天前开始。
@@ -276,12 +214,12 @@ def get_missing_dates(csv_file, item_ids, days_to_check=7):
     for i in range(3, days_to_check + 1):
         date = today - timedelta(days=i)
         target_dates.append(format_date_for_csv(date))
-    
+
     log(f'需要检查的日期: {target_dates} (T+2 保护: 跳过今天/昨天/前天)')
-    
+
     # 读取CSV中已有的数据
     existing_data = {}  # {item_id: set(dates)}
-    
+
     if os.path.exists(csv_file):
         try:
             encoding = detect_encoding(csv_file)
@@ -297,7 +235,7 @@ def get_missing_dates(csv_file, item_ids, days_to_check=7):
             log(f"CSV中已有 {len(existing_data)} 个商品的数据")
         except Exception as e:
             log(f"读取CSV分析欠缺日期失败: {e}")
-    
+
     # 找出每个商品欠缺的日期
     missing_dates = {}
     for item_id in item_ids:
@@ -306,7 +244,7 @@ def get_missing_dates(csv_file, item_ids, days_to_check=7):
         if missing:
             missing_dates[item_id] = missing
             log(f"商品 {item_id} 欠缺 {len(missing)} 天数据: {missing}")
-    
+
     return missing_dates
 
 
@@ -377,26 +315,26 @@ def _check_spa_date_match(date_str: str, spa_date_text: str,
 
 def fetch_item_data(page, item_id, target_date, fallback_date):
     """抓取单个商品的数据 - 修复版：确保选择正确的日期
-    
+
     Args:
         page: Playwright页面对象
         item_id: 商品ID
         target_date: 目标日期对象（优先尝试）
         fallback_date: 备选日期对象
-    
+
     Returns:
         dict: 包含资产数据的字典，失败返回None
     """
     # 确定DEBUG_DIR
-    debug_dir = Config.DEBUG_DIR if USING_COMMON else DEBUG_DIR
-    
+    debug_dir = Config.DEBUG_DIR
+
     # 初始化 selected_date（避免 Python 局部变量作用域问题）
     selected_date = None
-    
+
     # 2026-04 更新：需要加 spm 参数，否则返回404
     spm = Config.DMP_SPM
     route = Config.DMP_ROUTE_ITEM
-    
+
     # ===== 核心改进：直接在URL中包含日期参数，避免UI交互的不确定性 =====
     # 日期格式转换：支持 datetime 对象或字符串 '2026/4/3'
     if hasattr(target_date, 'strftime'):
@@ -411,7 +349,7 @@ def fetch_item_data(page, item_id, target_date, fallback_date):
             date_str = target_date.replace('/', '-')
     else:
         date_str = str(target_date)
-    
+
     # 正确格式: ?spm=xxx#!/route?itemId=xxx&endDate=2026-04-03&analysisTab=compete
     # 2026-06-13 发现：URL 中的 endDate 参数不生效，必须通过 UI 日期选择器选择日期
     # 但 URL 仍需要 endDate 作为兜底，保留原有格式
@@ -508,21 +446,21 @@ def fetch_item_data(page, item_id, target_date, fallback_date):
 
         # ===== Phase 1: 早期数据检查 + Fallback触发 =====
         # 注意：collector在整个过程中保持活跃，新的API响应会不断更新其内部assets
-        
+
         # ========== 优化: 延长等待时间让SPA有更多渲染机会 ==========
         # 问题：原5秒等待对于某些SPA可能不够，尤其是达摩盘这种重型前端框架
         # 方案：分阶段等待，期间持续检测collector是否有数据
         log("等待API响应（URL已包含日期参数，分阶段检测）...")
-        
+
         early_data = None
         max_wait = 12  # 最多等12秒
         waited = 0
         interval = 2   # 每2秒检查一次
-        
+
         while waited < max_wait:
             time.sleep(interval)
             waited += interval
-            
+
             # 检查是否有数据
             check_data = api_collector.get_data()
             if check_data and check_data.get('zichan_zongliang', 0) > 0:
@@ -531,7 +469,7 @@ def fetch_item_data(page, item_id, target_date, fallback_date):
                 break
             else:
                 log(f"  [{waited}s] 暂无数据，继续等待... (已拦截{api_collector.captured_count}次)")
-        
+
         if early_data is None:
             log(f"⚠️ {max_wait}秒内未捕获到有效API数据，尝试备用方案...")
 
@@ -556,7 +494,7 @@ def fetch_item_data(page, item_id, target_date, fallback_date):
             selected_date = select_date_smart_v2(page, target_date, fallback_date)
             if selected_date:
                 log(f"手动选择日期成功: {selected_date}")
-                
+
                 # ========== 优化: Fallback后智能等待 ==========
                 # 手动选择日期后，SPA需要时间重新请求数据并渲染
                 fallback_wait = 0
@@ -569,7 +507,7 @@ def fetch_item_data(page, item_id, target_date, fallback_date):
                         log(f"✅ Fallback后第{fallback_wait}秒检测到数据: {early_data.get('zichan_zongliang', 0):,}")
                         break
                     log(f"  Fallback后第{fallback_wait}秒，暂无数据... (已拦截{api_collector.captured_count}次)")
-                
+
                 if early_data and early_data.get('zichan_zongliang', 0) > 0:
                     log(f"✅ 备用方案成功，API数据: {early_data}")
                 else:
@@ -585,7 +523,7 @@ def fetch_item_data(page, item_id, target_date, fallback_date):
         stable_count = 0
         data_refreshed = False
         max_attempts = 12  # ========== 优化: 增加到12次(24秒)，给SPA更多渲染时间 ==========
-        
+
         # 从配置读取延迟参数
         anti_detect_cfg = CONFIG.get('anti_detect', {})
         delay_min = anti_detect_cfg.get('data_refresh_delay_min', 1.5)
@@ -605,7 +543,7 @@ def fetch_item_data(page, item_id, target_date, fallback_date):
                 });
                 return nums.join(',');
             }""")
-            
+
             # ========== 优化: 每轮都检查API数据（不减半） ==========
             fresh_api = api_collector.get_data()
             if fresh_api and fresh_api.get('zichan_zongliang', 0) > 0:
@@ -650,14 +588,14 @@ def fetch_item_data(page, item_id, target_date, fallback_date):
         final_data = api_collector.get_data()
         early_total = early_data.get('zichan_zongliang', 0) if early_data else 0
         final_total = final_data.get('zichan_zongliang', 0) if final_data else 0
-        
+
         if final_total > early_total:
             api_data = final_data
             log(f"[DEBUG] 使用最终收集数据（总量={final_total:,} > 早期{early_total:,}）")
         else:
             api_data = early_data or final_data
             log(f"[DEBUG] 使用早期数据（总量={early_total:,}），api_data = {api_data}")
-        
+
         # 检查数据有效性
         if api_data and api_data.get('zichan_zongliang', 0) <= 0:
             log(f"[DEBUG] 有效数据检查失败，api_data = {api_data}")
@@ -1107,7 +1045,7 @@ def _find_date_trigger_multi(page, timeout=5000):
 
     # ===== L2 + L3 防御 (2026-06-13 新增): 4 策略全失败时 =====
     log("  [_find_date_trigger_multi] 所有已知策略失败, 启动 L2 诊断 + L3 auto-heal")
-    debug_dir = Config.DEBUG_DIR if USING_COMMON else DEBUG_DIR
+    debug_dir = Config.DEBUG_DIR
     diag = _diagnose_datepicker(page, debug_dir)
 
     # L3: 行为探测 auto-heal (可用 env var 关闭: DISABLE_DATEPICKER_AUTOHEAL=1)
@@ -1140,20 +1078,20 @@ def _should_skip_datepicker(target_date) -> bool:
 
 def select_date_smart_v2(page, target_date, fallback_date):
     """智能日期选择V2 - 修复：确保点击的是日期选择器而非其他下拉框
-    
+
     关键区别：
     - 同行对比选择器：包含"同行同层"文本
     - 日期选择器：包含日期格式如"2026-03-23"
-    
+
     Returns:
         str: 选中的日期字符串（2026/3/26格式），失败返回None
     """
     # 确定debug目录
-    debug_dir = Config.DEBUG_DIR if USING_COMMON else DEBUG_DIR
-    
+    debug_dir = Config.DEBUG_DIR
+
     target_str = format_date_for_csv(target_date)
     fallback_str = format_date_for_csv(fallback_date)
-    
+
     log(f"尝试选择日期，目标: {target_str}, 备选: {fallback_str}")
 
     try:
@@ -1221,14 +1159,14 @@ def select_date_smart_v2(page, target_date, fallback_date):
 
         # 点击日期选择器 - 关键：必须点击包含日期格式的元素
         log("点击日期选择器...")
-        
+
         clicked = False
-        
+
         # 方法1：多路径fallback查找日期选择器触发元素
         try:
             log("尝试通过多路径fallback查找日期选择器...")
             date_trigger, trigger_strategy = _find_date_trigger_multi(page)
-            
+
             if date_trigger:
                 try:
                     date_trigger.scroll_into_view_if_needed()
@@ -1247,13 +1185,13 @@ def select_date_smart_v2(page, target_date, fallback_date):
                 log("方法1失败: 未能找到日期选择器")
         except Exception as e:
             log(f"方法1失败: {e}")
-        
+
         # 方法2：通过文本内容查找（支持"昨日"和日期格式）
         if not clicked:
             try:
                 date_elements = page.locator("text=/昨日|\\d{4}-\\d{2}-\\d{2}/").all()
                 log(f"方法2找到 {len(date_elements)} 个文本匹配元素")
-                
+
                 for i, el in enumerate(date_elements):
                     try:
                         text = el.text_content()
@@ -1272,7 +1210,7 @@ def select_date_smart_v2(page, target_date, fallback_date):
                         continue
             except Exception as e:
                 log(f"方法2失败: {e}")
-        
+
         # 方法3：JS 精确点击（.mxgc-calendar-datepicker 内的 .mx-trigger）
         if not clicked:
             js_result = page.evaluate("""() => {
@@ -1281,18 +1219,18 @@ def select_date_smart_v2(page, target_date, fallback_date):
                 if (!datePicker) {
                     return {success: false, reason: 'no-mxgc-calendar-datepicker'};
                 }
-                
+
                 const trigger = datePicker.querySelector('.mx-trigger');
                 if (!trigger) {
                     return {success: false, reason: 'no-trigger-in-datepicker'};
                 }
-                
+
                 // 点击触发器
                 trigger.click();
                 trigger.dispatchEvent(new MouseEvent('mousedown', {bubbles: true}));
                 trigger.dispatchEvent(new MouseEvent('mouseup', {bubbles: true}));
                 trigger.dispatchEvent(new MouseEvent('click', {bubbles: true}));
-                
+
                 return {
                     success: true,
                     method: 'datepicker-trigger-click',
@@ -1308,7 +1246,7 @@ def select_date_smart_v2(page, target_date, fallback_date):
                     human_delay_normal(1.5, 0.5, 0.8, 2.5)
                 else:
                     time.sleep(random.uniform(1, 3))
-        
+
         if not clicked:
             log("所有点击方法都失败")
             return None
@@ -1359,7 +1297,7 @@ def select_date_smart_v2(page, target_date, fallback_date):
 
         log("目标日期和备选日期都不可用")
         return None
-        
+
     except Exception as e:
         log(f"日期选择出错: {e}")
         import traceback
@@ -1389,7 +1327,7 @@ def try_select_date_v2(page, target_date):
         log(f"查找日期: {year}-{month:02d}-{day:02d}")
 
         # 先保存调试截图
-        debug_dir = Config.DEBUG_DIR if USING_COMMON else DEBUG_DIR
+        debug_dir = Config.DEBUG_DIR
         debug_screenshot = os.path.join(debug_dir, f"date_picker_debug_{year}{month:02d}{day:02d}.png")
         page.screenshot(path=debug_screenshot, full_page=False)
         log(f"已保存日期选择器调试截图: {debug_screenshot}")
@@ -1654,18 +1592,18 @@ class _ItemAssetCollector:
             current_data.get('fugou', 0),
             current_data.get('liandai', 0)
         ])
-        
+
         if current_total == 0 and sub_sum == 0:
             # 全0数据：可能是SPA还没加载完，标记但不拒绝
             log("[API-注意] 全0数据，可能T+1未更新或SPA未加载完毕，记录但不拒绝")
             # 不return，继续让collector有机会接收后续数据
-        
+
         # 规则2：资产总量小于阈值的通常是benchmark数据（除特定商品外）
         # 阈值可通过config/items.yaml中benchmark_filter.per_item为每个商品自定义
         elif current_total > 0 and current_total < self.min_valid_total:
             log(f"[API-过滤] 资产总量({current_total:,}) < {self.min_valid_total}，疑似benchmark数据，跳过")
             return
-        
+
         # 规则3：验证数据内部一致性 - 子字段之和不应远超总资产
         elif current_total > 0 and sub_sum > current_total * 1.5:
             log(f"[API-过滤] 子字段之和({sub_sum:,}) > 总资产({current_total:,})*1.5，数据异常，跳过")
@@ -1692,7 +1630,7 @@ class _ItemAssetCollector:
 
     def get_data(self):
         return self.assets
-    
+
     def diag_urls(self):
         return self.all_urls
 
@@ -1700,37 +1638,37 @@ class _ItemAssetCollector:
 # ============ 数据校验 ============
 def validate_item_data(data):
     """校验单品数据的合理性，异常数据不写入
-    
+
     Args:
         data: 包含单品资产数据的字典
-    
+
     Returns:
         tuple: (is_valid: bool, reason: str)
     """
     if not data:
         return False, "数据为空"
-    
+
     total = data.get('zichan_zongliang', 0)
     shougou = data.get('shougou', 0)
     qian = data.get('qian_zhongcao', 0)
     shen = data.get('shen_zhongcao', 0)
-    
+
     # 资产总量为0
     if total <= 0:
         return False, "资产总量为0，数据未刷新"
-    
+
     # 资产总量 < 首购（不合逻辑）
     if total < shougou:
         return False, f"资产总量({total}) < 首购({shougou})，数据异常"
-    
+
     # 浅种草+深种草 > 资产总量*1.5
     if qian + shen > total * 1.5:
         return False, f"种草({qian}+{shen}={qian+shen}) > 资产总量({total})*1.5，异常"
-    
+
     # 各层级数值应在合理范围内（正数且不过于悬殊）
     if shougou < 0 or shougou > total:
         return False, f"首购({shougou})超出合理范围"
-    
+
     return True, "OK"
 
 
@@ -1738,7 +1676,7 @@ def validate_item_data(data):
 
 def _get_completed_cache_path():
     """获取已完成任务缓存文件路径"""
-    data_file = Config.ITEM_DATA_FILE if USING_COMMON else DATA_FILE
+    data_file = Config.ITEM_DATA_FILE
     return str(Path(data_file).parent / 'completed_items.json')
 
 def _load_completed_items():
@@ -2042,7 +1980,8 @@ def _check_business_smoothness(csv_file, data, threshold=0.30):
     Returns:
         str or None: 警告信息（None = 通过）
     """
-    from datetime import datetime as dt, timedelta
+    from datetime import datetime as dt
+    from datetime import timedelta
 
     try:
         current_date = dt.strptime(data.get('date', ''), '%Y/%m/%d')
@@ -2081,7 +2020,8 @@ def _detect_copy_day(csv_file, data):
     Returns:
         tuple: (is_copy: bool, reason: str or None)
     """
-    from datetime import datetime as dt, timedelta
+    from datetime import datetime as dt
+    from datetime import timedelta
 
     try:
         current_date = dt.strptime(data.get('date', ''), '%Y/%m/%d')
@@ -2233,10 +2173,10 @@ def append_tocsv(csv_file, data):
             })
 
         log(f"已追加商品 {data['item_id']} {data['date']} 的数据到CSV（追加模式）")
-        
+
         # 标记为已完成（断点续传）
         _mark_completed(data['item_id'], data['date'])
-        
+
         return True
     except Exception as e:
         log(f"追加CSV失败: {e}")
@@ -2247,7 +2187,7 @@ def sortcsv_by_date(csv_file):
     """按日期升序对整个CSV文件排序（在抓取结束后调用）"""
     if not os.path.exists(csv_file):
         return
-    
+
     encoding = detect_encoding(csv_file)
     fieldnames = ['ID', '时间', '资产总量', '浅种草', '深种草', '首购资产', '复购资产', '连带资产', 'data_quality_flag']
 
@@ -2255,17 +2195,17 @@ def sortcsv_by_date(csv_file):
         with open(csv_file, 'r', encoding=encoding) as f:
             reader = csv.DictReader(f)
             rows = list(reader)
-        
+
         if not rows:
             return
-        
+
         sorted_rows = sorted(rows, key=lambda x: parse_date_for_sort(x.get('时间', '')))
-        
+
         with open(csv_file, 'w', encoding='utf-8', newline='') as f:
             writer = csv.DictWriter(f, fieldnames=fieldnames)
             writer.writeheader()
             writer.writerows(sorted_rows)
-        
+
         log(f"CSV已按日期排序: {csv_file} ({len(sorted_rows)} 行)")
     except Exception as e:
         log(f"排序CSV失败: {e}")
@@ -2274,39 +2214,36 @@ def sortcsv_by_date(csv_file):
 # ============ 主程序 ============
 def main():
     """独立运行入口"""
-    # 确定配置
-    if USING_COMMON:
-        data_file = Config.ITEM_DATA_FILE
-        item_ids = Config.ITEM_IDS
-        debug_dir = Config.DEBUG_DIR
-    
+    # 确定配置 (公共模块 dmp_common 已在模块顶部 import, USING_COMMON 永远是 True)
+    data_file = Config.ITEM_DATA_FILE
+    item_ids = Config.ITEM_IDS
+
     log("=" * 50)
     log("达摩盘单品洞察数据抓取工具启动")
     log("=" * 50)
-    
+
     # 读取账号
     username, password = read_account()
     if not username or not password:
         log("错误：无法读取账号密码")
         return False
     log(f"读取到账号: {username}")
-    
+
     # 获取目标日期
     t_minus_1, t_minus_2 = get_target_dates()
     log(f"目标日期 T-1: {format_date_for_csv(t_minus_1)}, T-2: {format_date_for_csv(t_minus_2)}")
-    
+
     # 分析欠缺日期
     log("\n" + "=" * 50)
     log("分析CSV中欠缺的日期...")
     log("=" * 50)
-    
-    if USING_COMMON:
-        missing_dates = get_missing_dates_item(data_file, item_ids, max_days_to_fill=90)
-    
+
+    missing_dates = get_missing_dates_item(data_file, item_ids, max_days_to_fill=90)
+
     if not missing_dates:
         log("所有商品最近7天的数据都已齐全，无需抓取")
         return True
-    
+
     # 构建需要抓取的任务列表
     tasks = []
     for item_id, dates in missing_dates.items():
@@ -2321,92 +2258,45 @@ def main():
                 })
             except Exception:
                 log(f"解析日期失败: {date_str}")
-    
+
     log(f"\n共需抓取 {len(tasks)} 条数据")
     for task in tasks[:5]:
         log(f"  - 商品 {task['item_id']} 日期 {task['date_str']}")
     if len(tasks) > 5:
         log(f"  ... 还有 {len(tasks)-5} 个任务")
-    
+
     # 启动浏览器
     log("\n启动浏览器...")
-    
-    if USING_COMMON:
-        # 使用公共模块的浏览器管理
-        with BrowserManager(headless=False) as browser:
-            page = browser.new_page()
-            page.set_viewport_size({'width': 1920, 'height': 1080})
-            
-            try:
-                # 登录
-                log("\n" + "=" * 50)
-                log("步骤1：登录千牛/淘宝")
-                log("=" * 50)
-                
-                if not login_qianniu(page, username, password, debug_name="item_login"):
-                    log("千牛登录失败，退出")
-                    return False
-                
-                log("\n[OK] 登录成功！")
-                
-                # 注入反检测脚本（公共模块模式）
-                if HAS_ANTI_DETECT:
-                    log("注入反检测脚本...")
-                    apply_anti_detect(page)
-                    log("反检测措施已启用")
-                
-                # 抓取数据
-                success_count, fail_tasks = run_items_fetch(page, tasks, data_file)
-                
-            except Exception as e:
-                log(f"运行出错: {e}")
-    else:
-        # 独立模式启动浏览器
-        os.makedirs(USER_DATA_DIR, exist_ok=True)
-        os.makedirs(debug_dir, exist_ok=True)
-        
-        with sync_playwright() as p:
-            browser = p.chromium.launch_persistent_context(
-                user_data_dir=USER_DATA_DIR,
-                headless=False,
-                args=[
-                    '--disable-blink-features=AutomationControlled',
-                    '--no-sandbox',
-                    '--disable-dev-shm-usage'
-                ]
-            )
-            
-            page = browser.new_page()
-            page.set_viewport_size({'width': 1920, 'height': 1080})
-            
-            try:
-                # 登录
-                log("\n" + "=" * 50)
-                log("步骤1：登录千牛/淘宝")
-                log("=" * 50)
-                
-                if not login_qianniu(page, username, password):
-                    log("千牛登录失败，退出")
-                    browser.close()
-                    return False
-                
-                log("\n[OK] 登录成功！")
-                
-                # 注入反检测脚本（独立模式）
-                if HAS_ANTI_DETECT:
-                    log("注入反检测脚本...")
-                    apply_anti_detect(page)
-                    log("反检测措施已启用")
-                
-                # 抓取数据
-                success_count, fail_tasks = run_items_fetch(page, tasks, data_file)
-                
-            except Exception as e:
-                log(f"运行出错: {e}")
-            
-            finally:
-                browser.close()
-    
+
+    # 启动浏览器 (USING_COMMON 永远是 True, 简化原 if/else 分支)
+    with BrowserManager(headless=False) as browser:
+        page = browser.new_page()
+        page.set_viewport_size({'width': 1920, 'height': 1080})
+
+        try:
+            # 登录
+            log("\n" + "=" * 50)
+            log("步骤1：登录千牛/淘宝")
+            log("=" * 50)
+
+            if not login_qianniu(page, username, password, debug_name="item_login"):
+                log("千牛登录失败，退出")
+                return False
+
+            log("\n[OK] 登录成功！")
+
+            # 注入反检测脚本
+            if HAS_ANTI_DETECT:
+                log("注入反检测脚本...")
+                apply_anti_detect(page)
+                log("反检测措施已启用")
+
+            # 抓取数据
+            success_count, fail_tasks = run_items_fetch(page, tasks, data_file)
+
+        except Exception as e:
+            log(f"运行出错: {e}")
+
     return True
 
 
@@ -2415,11 +2305,11 @@ def run_items_fetch(page, tasks, data_file):
     log("\n" + "=" * 50)
     log(f"步骤2：开始抓取 {len(tasks)} 条数据...")
     log("=" * 50)
-    
+
     # === 断点续传：加载已完成的任务 ===
     completed_items = _load_completed_items()
     log(f"已完成缓存中已有 {len(completed_items)} 条记录")
-    
+
     # 反检测：频率限制
     if HAS_ANTI_DETECT:
         rate_limiter = RateLimiter(
@@ -2428,50 +2318,50 @@ def run_items_fetch(page, tasks, data_file):
             max_delay=CONFIG.get('anti_detect', {}).get('item_delay_max', 30),
             max_requests_per_day=CONFIG.get('anti_detect', {}).get('max_requests_per_day', 50)
         )
-        
+
         # 检查每日请求限制
         if not rate_limiter.can_request():
             log(f"⚠️ 今日请求数已达上限({rate_limiter.max_requests_per_day})，停止抓取")
             return 0, tasks
-        
+
         # 限制单次运行数量
         original_count = len(tasks)
         limited_count = rate_limiter.should_limit(original_count)
         if limited_count < original_count:
             log(f"⚠️ 单次运行限制：从{original_count}条缩减到{limited_count}条")
             tasks = tasks[:limited_count]
-        
+
         log(f"频率限制器已启用 | 今日剩余请求: {rate_limiter.remaining_requests()}")
-    
+
     success_count = 0
     fail_tasks = []
-    
+
     for i, task in enumerate(tasks, 1):
         item_id = task['item_id']
         target_date = task['target_date']
         date_str = task['date_str']
-        
+
         # === 断点续传检查：跳过已完成的 ===
         if (item_id, date_str) in completed_items:
             log(f"[{i}/{len(tasks)}] 商品 {item_id} 日期 {date_str} 已完成，跳过")
             continue
-        
+
         log(f"\n{'='*30}")
         log(f"[{i}/{len(tasks)}] 商品 {item_id} 日期 {date_str}")
         log(f"{'='*30}")
-        
+
         try:
             # 为该日期构造T-1和T-2
             t1 = target_date
             t2 = target_date - timedelta(days=1)
-            
+
             data = fetch_item_data(page, item_id, t1, t2)
-            
+
             if data and data.get('zichan_zongliang', 0) > 0:
                 if append_tocsv(data_file, data):
                     success_count += 1
                     log(f"[OK] 商品 {item_id} 日期 {date_str} 抓取成功")
-                    
+
                     # 记录请求
                     if HAS_ANTI_DETECT:
                         rate_limiter.record_request()
@@ -2481,7 +2371,7 @@ def run_items_fetch(page, tasks, data_file):
             else:
                 log(f"[FAIL] 商品 {item_id} 日期 {date_str} 数据为空")
                 fail_tasks.append(task)
-            
+
             # 每个任务间隔 - 反检测：随机延迟替代固定5秒
             if i < len(tasks):
                 if HAS_ANTI_DETECT:
@@ -2494,24 +2384,24 @@ def run_items_fetch(page, tasks, data_file):
                     delay = random.uniform(5, 10)
                     log(f"等待 {delay:.1f}秒后处理下一个...")
                     time.sleep(delay)
-                
+
         except Exception as e:
             error_msg = str(e)
             log(f"[FAIL] 商品 {item_id} 日期 {date_str} 出错: {e}")
             fail_tasks.append(task)
-            
+
             # 检测浏览器是否崩溃，如果是则标记需要重启
             if 'closed' in error_msg.lower() or 'target' in error_msg.lower():
                 log("⚠️ 检测到浏览器可能已崩溃！")
                 raise  # 向上层抛出，由调用方决定是否重启浏览器
-    
+
     # 输出结果
     log("\n" + "=" * 50)
     log(f"单品洞察完成: 成功 {success_count}/{len(tasks)}")
     if fail_tasks:
         log(f"失败任务数: {len(fail_tasks)}")
     log("=" * 50)
-    
+
     return success_count, fail_tasks
 
 
@@ -2519,25 +2409,24 @@ def run_items_fetch(page, tasks, data_file):
 def run_with_page(page, missing_dates=None):
     """
     供 dmp_master.py 统一入口调用
-    
+
     Args:
         page: 已登录的Playwright页面对象
         missing_dates: 需要抓取的日期字典 {item_id: [date1, date2, ...]}，为None则自动检测
-    
+
     Returns:
         tuple: (success_count, total_count)
     """
-    data_file = Config.ITEM_DATA_FILE if USING_COMMON else DATA_FILE
-    item_ids = Config.ITEM_IDS if USING_COMMON else ITEM_IDS
-    
+    data_file = Config.ITEM_DATA_FILE
+    item_ids = Config.ITEM_IDS
+
     if missing_dates is None:
-        if USING_COMMON:
-            missing_dates = get_missing_dates_item(data_file, item_ids, max_days_to_fill=90)
-    
+        missing_dates = get_missing_dates_item(data_file, item_ids, max_days_to_fill=90)
+
     if not missing_dates:
         log("单品洞察数据已是最新，无需补齐")
         return 0, 0
-    
+
     # 构建任务列表
     tasks = []
     for item_id, dates in missing_dates.items():
@@ -2552,11 +2441,11 @@ def run_with_page(page, missing_dates=None):
                 })
             except Exception:
                 log(f"解析日期失败: {date_str}")
-    
+
     log(f"单品洞察共需抓取 {len(tasks)} 条数据")
-    
+
     success_count, fail_tasks = run_items_fetch(page, tasks, data_file)
-    
+
     return success_count, len(tasks)
 
 
