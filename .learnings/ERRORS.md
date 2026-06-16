@@ -426,47 +426,49 @@ sorted(dates)  # ['2026/5/1', '2026/5/10', '2026/5/11', ...'2026/5/19', '2026/5/
 
 ---
 
-## [ERR-20260616-006] xinzeng API 需 click 触发 (fix on branch, 待真实 DMP 验证)
+## [ERR-20260616-006] xinzeng API 需 click 触发 (resolved, 9 commits, PR #1 ready)
 
 **Logged**: 2026-06-16T22:15:00Z
 **Priority**: high
-**Status**: in-progress (fix on branch `fix/xinzeng-click-2026-06-16`, 待真实 DMP 验证)
+**Status**: resolved (PR #1 ready, 等用户 review + merge)
 **Area**: scraper/dmp-spa + scraper/auth
 
 ### Summary
-**两个独立 bug** (Playwright 单测证实):
+**4 个独立 bug 链** (Playwright 单测 + 跑批日志证实):
 1. **xinzeng API click 触发**: `page.goto + statusId=0` 不触发 DMP transfer API, 必须 click '新增' tab. 修复: `click_xinzeng_tab` + tab 顺序倒置 (Fix 5 in LESSONS.md)
-2. **check_dmp_session 反安全 timeout 逻辑**: Sprint 19+ #141 设计"3 次 API timeout → 信任 cookie", 但 cookie 失效时 fetch API 必然失败, 信任 cookie = scraper 浪费跑批. 6/16 跑批 chrome_profile/Cookies 实际失效, scraper 浪费 90s × 9 天 写 0 行. 修复: 保守 return False 触发重登.
+2. **check_dmp_session 反安全 timeout 逻辑** (Fix 6): Sprint 19+ #141 设计"3 次 API timeout → 信任 cookie", 现实踩坑: cookie 失效时 scraper 浪费 90s × 9 天. 修复: 保守 return False 触发重登.
+3. **Gate 4 zhiai 末节点误判残缺**: `_check_partial_flow_rows` 把 zhiai (末节点, 只有 self 循环) 误判残缺跳过写入. 修复: 排除 zhiai (与 xinzeng 同样).
+4. **append_flow_to_csv 字符串比较漏去重** (v0.1.14 漏修): CSV 历史无零填充 + 新写入零填充, 字符串不等 → 重复行. 修复: parse_date 转 date 对象去重.
 
-**真实 DMP 验证状态**: 6/16 23:18 跑批日志显示 click_xinzeng_tab 全部 `{ok: False}` (找不到 '新增' tab), 截图证实 DMP 8 秒后被重定向 `login.html` — 根因是 cookie 失效 (bug 2) 而非 click_xinzeng_tab (bug 1). 修复 bug 2 后, 用户重新登录 chrome_profile 再跑批, 才能验证 bug 1 修复.
+### Root Cause
+- bug 1: DMP SPA 对 `statusId=0 + page.goto` 不返回 transfer 数据, 需 click '新增' tab 触发
+- bug 2: Sprint 19+ #141 反安全设计 (避免误判重登 vs 浪费跑批, 选错方向)
+- bug 3: zhiai 是 CRM 阶段最高末节点, 自循环是 DMP 系统性占位, 不是残缺
+- bug 4: v0.1.14 修 date 格式漏了 dmp_flow_scraper.append_flow_to_csv
 
-### Root Cause (代码侧分析, 待真实 DMP 确认)
-DMP 是 SPA 应用. `page.goto + statusId=0` 是"裸 URL 访问", SPA 路由上下文未建立 (其他 statusId 是 SPA 已激活状态下的 navigate, 触发 DMP 后端 transfer API; statusId=0 是 SPA 初始状态, 后端不返回 transfer 数据). 需要先访问其他 7 个 tab 建立 SPA 上下文, 再 click '新增' tab 触发 transfer.
+### Fix (4 个子修复)
+1. **`click_xinzeng_tab` + tab 顺序倒置** (commit `82ba01c` + `d2ed068` JS 反逻辑修复)
+2. **`check_dmp_session` timeout → False** (commit `61f4cbe`)
+3. **Gate 4 排除 zhiai** (commit `af6c04d`)
+4. **`append_flow_to_csv` parse_date 去重** (commit `98bba44`)
 
-### Fix (方案 B: xinzeng click 化 + tab 顺序倒置)
-1. **新增** `click_xinzeng_tab(page)` (`core/dmp_flow_scraper.py:415-441`): evaluate 找含 '新增' 文字 + 可点击 + 左侧的 DOM 元素, 调用 `el.click()`. 返回 `{ok, top, left, text}` 供诊断日志.
-2. **改** `all_status_ids`: `[0, 2001, ...]` → `[2001, ..., 0]` (xinzeng 挪末尾, 让前置 7 个 page.goto 建立 SPA 上下文)
-3. **改** 主循环 (`core/dmp_flow_scraper.py:498-518`): xinzeng 改用 click_xinzeng_tab, 找不到时降级 page.goto
-4. **改** 兜底 (`core/dmp_flow_scraper.py:528-548`): 60s 轮询失败时, click_xinzeng_tab 重试, 仍失败降级 page.goto + DOM fallback
-5. **加** 4 个 regression test (`core/tests/test_dmp_flow_scraper.py`):
-   - `test_click_xinzeng_tab_returns_evaluate_result_verbatim` (返回值透传)
-   - `test_click_xinzeng_tab_passes_js_to_evaluate` (page.evaluate 调用契约)
-   - `test_click_xinzeng_tab_js_contains_required_matchers` (JS 防退化: '新增' 文字 + el.click() + rect.left 过滤)
-   - `test_click_xinzeng_tab_handles_ok_false` (找不到时返回 {ok: False}, 不抛异常)
+### Verified (真实 DMP 跑批)
+- 6/16 23:18 跑批: cookie 失效 → 8s 后重定向 login.html → scraper 浪费跑批 (root cause bug 2)
+- 用户重新登录 chrome_profile
+- 6/17 00:08 重跑批: login 成功, scraper 实际拿到 6/7~6/14 8 天真实数据 (xinzeng faxian=171845~1344536)
+- **Gate 4 修复后**: 8/9 天写入 CSV (T+1 6/15+6/16 数据未更新跳过, 符合预期)
+- 单品洞察 0/15: Date Sanity Check 触发 (6/16 DMP 后台未更新), 非 ERR-006 范围
 
-### TODO (验证后)
-1. 真实 DMP 跑批: 跑一天 (建议 T_OFFSET=2 跑 6/14), 看 [API] click_xinzeng_tab 结果日志 + xinzeng faxian 是否非零
-2. 验证通过后回填 6/7~6/15 (连续 9 天缺失)
-3. 跑 `BACKFILL_DAYS=9 ./run.sh -f` 或类似命令
-
-### Verified (单元测试层)
-- `PYTHONPATH=. pytest core/tests/` → **136/136 passed** (132 旧 + 4 新)
-- `ruff check core/dmp_flow_scraper.py core/tests/test_dmp_flow_scraper.py` → All checks passed
+### Verified (单元 + JS 行为层)
+- `PYTHONPATH=. pytest core/tests/` → **139/139 passed** (132 旧 + 7 新: 4 click_xinzeng + 2 append_flow_to_csv dedup + 1 Gate 4 zhiai)
+- Node mock JS 行为 6 case → 全过 (左侧 click ✓ / 右侧过滤 ✓)
+- ruff check 我改的 5 文件 → All checks passed (其他文件预先存在 255 errors, 不阻塞)
 
 ### Metadata
-- Related Files: `core/dmp_flow_scraper.py:415-441 (click_xinzeng_tab), 462-466 (status ids), 498-518 (主循环), 528-548 (兜底)`, `core/tests/test_dmp_flow_scraper.py:217-272`
-- Tests: 136/136 (was 132 + 4 new)
-- Branch: `fix/xinzeng-click-2026-06-16`
+- Related Files: `core/dmp_flow_scraper.py`, `core/dmp_common.py`, `core/tests/test_dmp_flow_scraper.py`, `core/tests/test_check_dmp_session.py`, `core/tests/test_dmp_common.py`, `.learnings/ERRORS.md`, `CHANGELOG.md`, `docs/maintenance/LESSONS.md`
+- Tests: 139/139 (was 132 + 7 new)
+- Branch: `fix/xinzeng-click-2026-06-16` (9 commits ahead of main)
+- PR: https://github.com/weiweity/dmp-data-scraper/pull/1 (draft, ready 待 review)
 
 ### Metadata
 - Related Files: core/dmp_scraper.py
