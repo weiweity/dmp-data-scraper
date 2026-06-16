@@ -4,6 +4,60 @@
 
 ---
 
+## [v0.1.26] - 2026-06-16 - chore(refactor): 清 4 件 P2 tech debt (CLAUDE.md §11)
+
+### 背景
+2026-06-14 收工时遗留 8 件 P2 tech debt (CLAUDE.md §11), 全部因"不懂"而跳过。
+2026-06-16 跟用户讨论后, 先攻 4 件 LOW 风险 (无需用户决策的清理), 大文件拆 / 异常处理 / retry 策略 仍待用户澄清后再做。
+
+### Removed (Item 1: bare except → print warning)
+- **core/dmp_common.py:55-70, 70-79**: `os.makedirs` 和 `log` 文件写 try/except 加 print 警告 (throttle 50 次一次避免刷屏). 仍是 best-effort, 不 raise, 但 silent fail → visible
+- **core/utils/log.py:16-30**: 同上, 删 module init 和 log() 写文件的 silent fail
+
+### Removed (Item 2: chrome_profile basename 死代码)
+- **core/dmp_item_insight_scraper.py:155-163**: ConfigAdapter 的 get('paths')/get('browser') 用 os.path.basename() 取 folder name. USING_COMMON=False 分支删除后, 这两个分支成为不可达, 死代码连带删除
+- **core/dmp_common.py 等**: 不动 USER_DATA_DIR 全路径 (BrowserManager 仍用全路径, 合理)
+
+### Removed (Item 3: _parse_date 死 re-export)
+- **core/validators/items_validators.py:25-26**: `from core.utils.dates import parse_date as _parse_date  # noqa: F401` 0 内部调用. sanity_check.py 用自己的定义 (3 调用保留). 删 re-export
+
+### Removed (Item 4: USING_COMTERN 死分支, 21+ 处)
+- **core/dmp_flow_scraper.py**:
+  - 改 `from dmp_common import` → `from core.dmp_common import` (绝对 import, 同时支持脚本+包模式)
+  - 删 `try/except ImportError` (3 行)
+  - 删 `if USING_COMMON:` blocks (4 处)
+  - 删 ternary `Config.X if USING_COMMON else LOCAL_X` (3 处)
+  - 删死 buggy `login_qianniu` 包装函数 (递归 bug, 永远不工作. dmp_master.py 直接用 dmp_common.login_qianniu)
+- **core/dmp_item_insight_scraper.py**:
+  - 同样改绝对 import
+  - 删整个 `except ImportError:` 块 (52 行 fallback 定义: log / detect_encoding / read_account / format_date_for_csv)
+  - 删 ternary 简化 (14 处)
+  - ConfigAdapter 删 get('paths')/get('browser') 死分支
+- 净 diff: -124 行 (-357 / +233). 128/128 tests pass.
+
+### Docs
+- **CLAUDE.md §11**: 4 件 P2 标记 ✅ 已清, 剩 4 件 (大文件拆 / 异常处理 / retry 策略 / SPM 硬编码)
+- **CLAUDE.md §11**: 修 dmp_item_insight_scraper.py 行数 3246 → 2565 (过期修正, 2026-06-16 wc -l 验证)
+
+### 验证
+- `PYTHONPATH=. pytest core/tests/ -q` → **128/128 passed**
+- `ruff check core/dmp_flow_scraper.py core/dmp_item_insight_scraper.py` → All checks passed
+
+### Lesson
+- "try/except ImportError" 模式在 from dmp_common (顶层, 不带 core. 前缀) 时看起来优雅, 但
+  隐藏了 "USING_COMMON=False 路径是 broken" 的事实. 改成绝对 import + 假设 dmp_common 总
+  可用, 让 broken code 直接爆错而不是 silent fall through.
+- 简化前先 grep 确认 0 调用方, 才能删. ConfigAdapter.get('paths')/get('browser') 的 basename
+  看起来"在用"但其实只在 USING_COMTERN=False 分支用 (那个分支本来就是死的).
+- ruff --fix 处理 87/104 lint 错误, 剩下 17 是 W293 (空白行 whitespace), 用 Python 正则
+  一行 strip 干净.
+
+### Metadata
+- Related Files: `core/dmp_common.py`, `core/utils/log.py`, `core/validators/items_validators.py`, `core/dmp_flow_scraper.py`, `core/dmp_item_insight_scraper.py`, `CLAUDE.md`
+- Net diff: 5 files + 1 doc, +239/-368 行 (含 128 测试无关的纯清理)
+
+---
+
 ## [v0.1.25] - 2026-06-16 - fix(flow): 加 Gate 4 残缺数据检测 (Detail 3+4, T+2 缺失兜底)
 
 ### 背景
