@@ -71,8 +71,12 @@ def test_check_dmp_session_timeout_then_success(mock_log) -> None:
 
 
 @patch("core.dmp_common.log")
-def test_check_dmp_session_all_timeout_returns_true(mock_log) -> None:
-    """3 次 API 都 timeout → 默认 True（信任 cookie 在）."""
+def test_check_dmp_session_all_timeout_returns_false(mock_log) -> None:
+    """3 次 API 都 timeout → 保守返 False (视为失效, 触发重登).
+
+    2026-06-16 ERR-20260616-006 修复: 旧逻辑 timeout → True 信任 cookie 导致 6/16 跑批
+    cookie 实际失效时 scraper 浪费 90s × 9 天. 新逻辑 timeout → False 触发重登.
+    """
     mock_page = MagicMock()
     mock_page.evaluate.side_effect = Exception("API timeout")
     mock_page.query_selector_all.return_value = []
@@ -80,7 +84,7 @@ def test_check_dmp_session_all_timeout_returns_true(mock_log) -> None:
 
     result = check_dmp_session(mock_page, max_retries=3)
 
-    assert result is True  # 不再误判为失效
+    assert result is False  # 保守视为失效, 触发重登
     assert mock_page.evaluate.call_count == 3
 
 
@@ -136,7 +140,7 @@ def test_check_dmp_session_login_in_title(mock_log) -> None:
 
 @patch("core.dmp_common.log")
 def test_check_dmp_session_custom_max_retries(mock_log) -> None:
-    """自定义 max_retries=5，5 次都 timeout → True."""
+    """自定义 max_retries=5，5 次都 timeout → False (保守视为失效)."""
     mock_page = MagicMock()
     mock_page.evaluate.side_effect = Exception("timeout")
     mock_page.query_selector_all.return_value = []
@@ -144,5 +148,5 @@ def test_check_dmp_session_custom_max_retries(mock_log) -> None:
 
     result = check_dmp_session(mock_page, max_retries=5)
 
-    assert result is True
+    assert result is False
     assert mock_page.evaluate.call_count == 5

@@ -124,7 +124,10 @@ def test_gate4_skip_initial_zero() -> None:
 
 
 def test_gate4_report_multiple_crowds() -> None:
-    """Gate 4: 多人群都残缺 → 报告所有 (而不是 first-match-return)."""
+    """Gate 4: 多人群都残缺 → 报告所有 (而不是 first-match-return).
+
+    2026-06-17 修复: zhiai 末节点跳过 (不是 7 个, 是 6 个非 xinzeng 非 zhiai 人群)
+    """
     rows = [
         _row(crowd="faxian", initial=11000601, zhuanfaxian=11000601),  # 只 self
         _row(crowd="zhongcao", initial=44682728, zhuanzhongcao=44682728),
@@ -132,14 +135,30 @@ def test_gate4_report_multiple_crowds() -> None:
         _row(crowd="xingdong", initial=2491715, zhuanxingdong=2491715),
         _row(crowd="shougou", initial=948690, zhuanshougou=948690),
         _row(crowd="fugou", initial=255944, zhuanfugou=255944),
-        _row(crowd="zhiai", initial=243399),  # self 都缺, 非零列=0
+        _row(crowd="zhiai", initial=243399),  # 末节点, skip (只有 self 是合法的)
         _row(crowd="xinzeng", initial=0),  # skip
     ]
     partial = _check_partial_flow_rows(rows)
-    # 7 个非 xinzeng 人群, 都 ≤ 1 非零列 → 全部报告
-    assert len(partial) == 7
-    for crowd in ("faxian", "zhongcao", "hudong", "xingdong", "shougou", "fugou", "zhiai"):
+    # 6 个非 xinzeng 非 zhiai 人群, 都 ≤ 1 非零列 → 全部报告
+    assert len(partial) == 6
+    for crowd in ("faxian", "zhongcao", "hudong", "xingdong", "shougou", "fugou"):
         assert any(crowd in p for p in partial), f"missing {crowd} in {partial}"
+    # zhiai 末节点不应报告
+    assert not any("zhiai" in p for p in partial), f"zhiai 末节点不应被报残缺: {partial}"
+
+
+def test_gate4_skip_zhiai_terminal_node() -> None:
+    """Gate 4: zhiai 末节点 (CRM 阶段最高) 不参与残缺判断.
+
+    zhiai 没有下一阶段可流转, "只有 self 循环" 是合法的非残缺状态.
+    旧 Gate 4 把 zhiai 误判残缺跳过写入, 导致 6/7~6/15 全部 8/9 天数据没进 CSV.
+    """
+    rows = [_row(crowd="zhiai", initial=243845, zhuanzhiai=243845)]  # 末节点只有 self
+    assert _check_partial_flow_rows(rows) == []  # 不应报残缺
+
+    # zhiai 即便完全没有自循环也不报 (initial>0 但无任何流转出去)
+    rows = [_row(crowd="zhiai", initial=243845)]
+    assert _check_partial_flow_rows(rows) == []
 
 
 def test_gate4_mixed_pass_and_fail() -> None:
@@ -213,3 +232,124 @@ def test_is_flow_data_stale_self_only_stale_returns_true() -> None:
     data["faxian"]["initial"] = 11000601
     data["faxian"]["faxian"] = 11000601  # self == initial, 没跨阶段流转
     assert is_flow_data_stale(data) is True
+
+
+# ========== click_xinzeng_tab (ERR-20260616-006) ==========
+
+from unittest.mock import MagicMock
+
+from core.dmp_flow_scraper import click_xinzeng_tab
+
+
+def test_click_xinzeng_tab_returns_evaluate_result_verbatim() -> None:
+    """click_xinzeng_tab: 返回值 = page.evaluate() 的结果 (透传)."""
+    page = MagicMock()
+    page.evaluate.return_value = {"ok": True, "top": 120, "left": 50, "text": "新增"}
+
+    result = click_xinzeng_tab(page)
+
+    assert result == {"ok": True, "top": 120, "left": 50, "text": "新增"}
+    assert page.evaluate.call_count == 1
+
+
+def test_click_xinzeng_tab_passes_js_to_evaluate() -> None:
+    """click_xinzeng_tab: 调用 page.evaluate 时传入 JS 字符串 (非 callable)."""
+    page = MagicMock()
+    page.evaluate.return_value = {"ok": False}
+
+    click_xinzeng_tab(page)
+
+    # 验证传入 page.evaluate 的是 str (Playwright 接受 str 或 callable)
+    js_arg = page.evaluate.call_args[0][0]
+    assert isinstance(js_arg, str)
+    assert len(js_arg) > 50  # 防止 JS 被误删成空
+
+
+def test_click_xinzeng_tab_js_contains_required_matchers() -> None:
+    """click_xinzeng_tab: JS 必须含 '新增' 文字匹配 + click() 调用 + 位置过滤.
+
+    防退化: 未来 PR 简化 JS 时可能误删过滤条件, 导致点击错误元素或点击 '新增流转' 等.
+    """
+    page = MagicMock()
+    page.evaluate.return_value = {"ok": False}
+
+    click_xinzeng_tab(page)
+    js = page.evaluate.call_args[0][0]
+
+    # 必须含核心选择逻辑
+    assert "'新增'" in js or '"新增"' in js, "JS 必须精确匹配 '新增' 文字"
+    assert "el.click()" in js, "JS 必须调用 el.click()"
+    assert "rect.left" in js, "JS 必须用 rect.left 做位置过滤"
+    assert "getBoundingClientRect" in js, "JS 必须用 getBoundingClientRect 取位置"
+    # 防退化: 位置过滤语义必须是"右侧跳过, 左侧执行 click"
+    # 之前误写 `rect.left < 200 continue` (左侧跳过, 反逻辑), 已修
+    assert ">= 200" in js, "JS 必须用 '>= 200' 跳过右侧元素 (左侧 tab 才 click)"
+
+
+def test_click_xinzeng_tab_handles_ok_false() -> None:
+    """click_xinzeng_tab: 找不到 '新增' tab 时返回 {ok: False}, 不抛异常."""
+    page = MagicMock()
+    page.evaluate.return_value = {"ok": False}
+
+    result = click_xinzeng_tab(page)
+
+    assert result == {"ok": False}
+    # 不重试 / 不抛异常 (调用方负责降级到 page.goto)
+
+
+# ========== append_flow_to_csv 日期格式去重 (v0.1.14 漏修) ==========
+
+import csv as _csv_stdlib
+import tempfile as _tempfile
+from core.dmp_flow_scraper import append_flow_to_csv
+
+
+def _make_flow_data(initial: int = 1000) -> dict:
+    """构造合法 flow_data (8 个 crowd, 不触发 Gate 4)."""
+    return {crowd: {"initial": initial, "faxian": 100, "zhongcao": 100, "hudong": 100,
+                    "xingdong": 100, "shougou": 100, "fugou": 0, "zhiai": 0, "xinzeng": 0}
+            for crowd in ("faxian", "zhongcao", "hudong", "xingdong", "shougou",
+                          "fugou", "zhiai", "xinzeng")}
+
+
+def test_append_flow_to_csv_dedup_legacy_unpadded_format() -> None:
+    """append_flow_to_csv: CSV 含旧格式 `2026/6/7` (无零填充) + 新格式 `2026/06/07` 共存时, 按日期对象去重不重复.
+
+    2026-06-17 修复: v0.1.14 修了 dmp_item_insight_scraper 的 date 格式但漏了 dmp_flow_scraper.append_flow_to_csv.
+    旧逻辑 `row.get('date') != date_str` 是字符串比较, 两种格式不等 → 重复行.
+    """
+    with _tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False, encoding='utf-8') as f:
+        writer = _csv_stdlib.writer(f)
+        writer.writerow(['date', 'crowd', 'initial', 'zhuanfaxian', 'zhuanzhongcao',
+                         'zhuanhudong', 'zhuanxingdong', 'zhuanshougou', 'zhuanfugou', 'zhuanzhiai'])
+        # 旧格式: 2026/6/7 (无零填充)
+        for crowd in ("faxian", "zhongcao", "hudong", "xingdong", "shougou", "fugou", "zhiai", "xinzeng"):
+            writer.writerow(["2026/6/7", crowd, 1000, 500, 100, 0, 0, 0, 0, 0])
+        csv_path = f.name
+
+    # 新格式写入: 2026/06/07 (零填充, 来自 format_date_for_csv)
+    append_flow_to_csv(csv_path, "2026/06/07", _make_flow_data(initial=2000))
+
+    # 验证: 6/7 仍只有 8 行, 不重复
+    with open(csv_path, encoding='utf-8') as f:
+        reader = _csv_stdlib.DictReader(f)
+        rows_6_7 = [r for r in reader if r['date'] in ("2026/6/7", "2026/06/07")]
+    assert len(rows_6_7) == 8, f"6/7 应有 8 行 (按日期对象去重), 实际 {len(rows_6_7)} 行"
+
+
+def test_append_flow_to_csv_dedup_zero_padded_format() -> None:
+    """append_flow_to_csv: CSV 含零填充格式 `2026/06/07`, 再写入同日期零填充 → 去重不重复."""
+    with _tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False, encoding='utf-8') as f:
+        writer = _csv_stdlib.writer(f)
+        writer.writerow(['date', 'crowd', 'initial', 'zhuanfaxian', 'zhuanzhongcao',
+                         'zhuanhudong', 'zhuanxingdong', 'zhuanshougou', 'zhuanfugou', 'zhuanzhiai'])
+        for crowd in ("faxian", "zhongcao", "hudong", "xingdong", "shougou", "fugou", "zhiai", "xinzeng"):
+            writer.writerow(["2026/06/07", crowd, 1000, 500, 100, 0, 0, 0, 0, 0])
+        csv_path = f.name
+
+    append_flow_to_csv(csv_path, "2026/06/07", _make_flow_data(initial=2000))
+
+    with open(csv_path, encoding='utf-8') as f:
+        reader = _csv_stdlib.DictReader(f)
+        rows_6_7 = [r for r in reader if r['date'] in ("2026/6/7", "2026/06/07")]
+    assert len(rows_6_7) == 8, f"6/7 应有 8 行, 实际 {len(rows_6_7)} 行"

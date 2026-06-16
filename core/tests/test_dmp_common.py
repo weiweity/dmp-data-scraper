@@ -50,13 +50,15 @@ def test_check_dmp_session_business_layer_invalid():
 
 
 def test_check_dmp_session_api_timeout():
-    """API 调用异常 (timeout) → 3 次重试后默认返 True (信任 cookie 有效)
+    """API 调用异常 (timeout) → 3 次重试后返 False (保守视为失效, 需重登)
 
-    Sprint 19+ 改造: 旧实现是 timeout → False 触发不必要的重登
-    新实现: 3 次重试后无明确结果 → True, 避免误判触发重登
+    Sprint 19+ #141 旧设计: timeout → True (信任 cookie, 避免误判触发不必要的重登)
+    2026-06-16 ERR-20260616-006 修复: timeout → False (保守, 宁可重登一次不浪费一天跑批).
+    现实踩坑: 6/16 跑批 cookie 实际失效 (DMP 重定向 login.html), 3 次 fetch API 都失败,
+    旧逻辑信任 cookie 让 scraper 浪费 90s × 9 天.
     """
     page = _mock_page(api_exc=Exception("API timeout"))
-    assert check_dmp_session(page) is True
+    assert check_dmp_session(page) is False
     # 验证重试 3 次（不再是 1 次）
     assert page.evaluate.call_count == 3
 

@@ -4,6 +4,74 @@
 
 ---
 
+## [v0.1.29] - 2026-06-16 - fix(common): check_dmp_session 反安全 timeout 逻辑 (ERR-20260616-006 子 bug)
+
+### 背景
+Playwright 单测 (`/tmp/test_goto_dmp.png`) 证实 6/16 跑批 chrome_profile/Cookies 实际失效, DMP 8 秒后强制重定向 `login.html`. 但 `check_dmp_session` 3 次 API timeout 后"默认相信 cookie 有效" → scraper 进 scraper 浪费 90s × 9 天, 写 0 行. Sprint 19+ #141 设计决策错位: 当时认为 "3 次 API 异常 = 网络抖动", 实际 "3 次异常 = cookie 失效" 才是主因.
+
+### Fixed
+- **core/dmp_common.py:427-435**: `if is_login is None: return True` → `return False`. 保守策略: 3 次 API timeout 视为失效, 触发重登流程 (宁可重登一次, 不浪费一天跑批).
+- **core/tests/test_dmp_common.py**: `test_check_dmp_session_api_timeout` 期望 True → False
+- **core/tests/test_check_dmp_session.py**: `test_check_dmp_session_all_timeout_returns_true` → `..._returns_false` (重命名 + 期望 False) + `test_check_dmp_session_custom_max_retries` 期望 True → False
+
+### Verified
+- `PYTHONPATH=. pytest core/tests/` → **136/136 passed**
+- 现实跑批证据: 6/16 23:18 scraper 浪费 90s × 2 天 (6/7+6/8) 写 0 行后中断
+
+### 反 Sprint 19+ #141 设计说明
+原设计意图 (避免误判触发不必要的重登) 与现实踩坑 (cookie 失效时 scraper 90s × N 天 浪费) 矛盾. 宁可重登一次, 不浪费一天跑批. 用户 review 时需确认.
+
+### Metadata
+- Related Files: `core/dmp_common.py:427-435`, `core/tests/test_dmp_common.py:52-62`, `core/tests/test_check_dmp_session.py:74-86, 138-149`
+- Tests: 136/136 (passed, 2 个 timeout 测试期望翻转)
+- 反 Sprint 19+ #141: 需用户 review 确认
+
+---
+
+## [v0.1.28] - 2026-06-16 - fix(flow): xinzeng click 触发替代 page.goto (ERR-20260616-006, 待真实 DMP 验证)
+
+### 背景
+ERR-005 (v0.1.27) 修了 stale check 把 all-zero 当 stale 处理, 但 xinzeng (新增) 数据仍持续 0 (6/7~6/15 连续 9 天缺失). 用户报告: xinzeng (statusId=0) DMP transfer API 只在"先随机点一个 tab, 再点 xinzeng tab"时才触发. `page.goto + statusId=0` 不触发 DMP 后端 transfer API.
+
+### Root Cause (代码侧分析, 待真实 DMP 确认)
+DMP 是 SPA 应用. `page.goto + statusId=0` 是"裸 URL 访问", SPA 路由上下文未建立. DMP 后端需要 SPA 激活状态下的 tab 切换请求才返回 transfer 数据. page.goto 对其他 statusId 有效是因为 SPA 已被激活; statusId=0 是 SPA 初始状态, 后端不返回 transfer. 需先访问其他 7 个 tab 建立 SPA 上下文, 再 click '新增' tab 触发 transfer.
+
+### Fixed
+- **core/dmp_flow_scraper.py:415-441**: 新增 `click_xinzeng_tab(page)` evaluate 找含 '新增' 文字 + 可点击 + 左侧 (left<200) 的 DOM 元素, 调用 `el.click()`. 返回 `{ok, top, left, text}` 供诊断日志. 找不到时返回 `{ok: False}` (调用方降级到 page.goto).
+- **core/dmp_flow_scraper.py:462-466**: `all_status_ids = [0, ...]` → `[2001, 2002, 2003, 2004, 2006, 2007, 2008, 0]` (xinzeng 挪末尾, 前置 7 个 page.goto 帮助建立 SPA 路由上下文)
+- **core/dmp_flow_scraper.py:498-518**: 主循环 xinzeng (status_id==0) 改用 click_xinzeng_tab, 找不到时降级 page.goto
+- **core/dmp_flow_scraper.py:528-548**: 60s 轮询失败兜底改为 click_xinzeng_tab 重试, 仍失败降级 page.goto + DOM fallback
+- **.learnings/ERRORS.md**: ERR-20260616-006 状态 open → in-progress (fix on branch)
+
+### Added
+- **core/tests/test_dmp_flow_scraper.py** +4 tests (ERR-20260616-006 回归测试):
+  - `test_click_xinzeng_tab_returns_evaluate_result_verbatim` (返回值透传)
+  - `test_click_xinzeng_tab_passes_js_to_evaluate` (page.evaluate 调用契约)
+  - `test_click_xinzeng_tab_js_contains_required_matchers` (JS 防退化: '新增' 文字 + el.click() + rect.left 过滤 + getBoundingClientRect)
+  - `test_click_xinzeng_tab_handles_ok_false` (找不到时返回 {ok: False}, 不抛异常)
+
+### 验证 (单元测试层)
+- `PYTHONPATH=. pytest core/tests/` → **136/136 passed** (132 旧 + 4 新)
+- `ruff check core/dmp_flow_scraper.py core/tests/test_dmp_flow_scraper.py` → All checks passed
+
+### 待真实 DMP 验证 (用户执行, 硬阻塞)
+1. `T_OFFSET=2 ./run.sh -f` 跑 6/14 (避免 DMP T+1 时序问题), 期望日志出现 `[API] click_xinzeng_tab 结果: {ok: True, ...}` + `xinzeng faxian` 非零
+2. 验证通过后 `./run.sh -b 9 -f` 回填 6/7~6/15 (连续 9 天缺失)
+3. `.learnings/ERRORS.md` ERR-20260616-006 状态 → resolved, 加真实 DMP 验证结果
+
+### Lesson
+- **DMP SPA 对 statusId=0 + page.goto 有特殊处理**: 用户手动 click 能触发, 自动化 page.goto 不行. 通用规则: SPA 应用, `page.goto` 仅在 SPA 已激活状态下有效; 初始状态 tab 必须用真实 click 触发.
+- **tab 顺序与 SPA 路由上下文**: 前置 tab 的 page.goto 帮助建立 SPA 路由上下文, 此时再 click 初始状态 (statusId=0) 才触发. tab 顺序敏感, 反转会触发失败.
+- **降级路径要保留**: click_xinzeng_tab 找不到 '新增' tab 时降级到 page.goto + DOM fallback. 双重防御保证鲁棒性.
+
+### Metadata
+- Related Files: `core/dmp_flow_scraper.py:415-441 (click_xinzeng_tab), 462-466 (status ids), 498-518 (主循环), 528-548 (兜底)`, `core/tests/test_dmp_flow_scraper.py:217-272`, `.learnings/ERRORS.md`
+- Tests: 136/136 (was 132 + 4 new)
+- Branch: `fix/xinzeng-click-2026-06-16`
+- 待真实 DMP 验证 (硬阻塞)
+
+---
+
 ## [v0.1.27] - 2026-06-16 - fix(flow): is_flow_data_stale 全 0 误写入 (ERR-20260616-005)
 
 ### 背景

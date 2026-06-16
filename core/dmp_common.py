@@ -424,10 +424,14 @@ def check_dmp_session(page, max_retries: int = 3):
                 log(f"[会话检测] 第 {attempt}/{max_retries} 次: API 异常: {e}，重试")
                 page.wait_for_timeout(1000)
 
-        # 3 次都 timeout → 默认相信 cookie 还在（避免误判触发不必要的重登）
+        # 3 次都 timeout → 保守视为失效 (2026-06-16 ERR-20260616-006 修复)
+        # Sprint 19+ #141 旧设计: 默认相信 cookie 有效 (避免误判触发不必要的重登)
+        # 现实踩坑: 6/16 跑批 cookie 实际失效 (DMP 重定向 login.html), 3 次 fetch API 都失败,
+        # 旧逻辑信任 cookie 让 scraper 进 scraper, 90s × 9 天 浪费, 写 0 行.
+        # 新逻辑: 无明确结果 → return False 触发重登 (宁可重登一次, 不浪费一天跑批).
         if is_login is None:
-            log(f"[会话检测] {max_retries} 次 API 调用均无明确结果，默认相信 cookie 有效")
-            return True
+            log(f"[会话检测] {max_retries} 次 API 调用均无明确结果，保守视为失效，需重新登录")
+            return False
 
         if not is_login:
             log("[会话检测] 业务层 session 失效 (/api_2/login/loginuserinfo isLogin=false), 需要重新登录")
