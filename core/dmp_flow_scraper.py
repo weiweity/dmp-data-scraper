@@ -694,12 +694,15 @@ def _check_partial_flow_rows(new_rows):
     - T+2 抓取时 DMP 页面没有目标日期 (initial=0, 但仍可能有 self 残留)
     - 防止 Gate 3 (实质相同) 拦不住的"残缺但不一致"数据写入
 
-    xinzeng 行不参与判断 (initial=0 是常态).
+    排除:
+    - xinzeng 行不参与 (initial=0 是常态, 特殊 statusId=0)
+    - zhiai 行不参与 (末节点, 自循环 zhuanzhiai 是 DMP 系统性占位,
+      没有下一阶段可流转, "只有 self" 是合法的非残缺状态)
     """
     partial = []
     for row in new_rows:
         crowd = row.get('crowd', '')
-        if crowd == 'xinzeng':
+        if crowd in ('xinzeng', 'zhiai'):
             continue
         initial = _to_int(row.get('initial', 0))
         if initial <= 0:

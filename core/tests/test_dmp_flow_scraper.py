@@ -124,7 +124,10 @@ def test_gate4_skip_initial_zero() -> None:
 
 
 def test_gate4_report_multiple_crowds() -> None:
-    """Gate 4: 多人群都残缺 → 报告所有 (而不是 first-match-return)."""
+    """Gate 4: 多人群都残缺 → 报告所有 (而不是 first-match-return).
+
+    2026-06-17 修复: zhiai 末节点跳过 (不是 7 个, 是 6 个非 xinzeng 非 zhiai 人群)
+    """
     rows = [
         _row(crowd="faxian", initial=11000601, zhuanfaxian=11000601),  # 只 self
         _row(crowd="zhongcao", initial=44682728, zhuanzhongcao=44682728),
@@ -132,14 +135,30 @@ def test_gate4_report_multiple_crowds() -> None:
         _row(crowd="xingdong", initial=2491715, zhuanxingdong=2491715),
         _row(crowd="shougou", initial=948690, zhuanshougou=948690),
         _row(crowd="fugou", initial=255944, zhuanfugou=255944),
-        _row(crowd="zhiai", initial=243399),  # self 都缺, 非零列=0
+        _row(crowd="zhiai", initial=243399),  # 末节点, skip (只有 self 是合法的)
         _row(crowd="xinzeng", initial=0),  # skip
     ]
     partial = _check_partial_flow_rows(rows)
-    # 7 个非 xinzeng 人群, 都 ≤ 1 非零列 → 全部报告
-    assert len(partial) == 7
-    for crowd in ("faxian", "zhongcao", "hudong", "xingdong", "shougou", "fugou", "zhiai"):
+    # 6 个非 xinzeng 非 zhiai 人群, 都 ≤ 1 非零列 → 全部报告
+    assert len(partial) == 6
+    for crowd in ("faxian", "zhongcao", "hudong", "xingdong", "shougou", "fugou"):
         assert any(crowd in p for p in partial), f"missing {crowd} in {partial}"
+    # zhiai 末节点不应报告
+    assert not any("zhiai" in p for p in partial), f"zhiai 末节点不应被报残缺: {partial}"
+
+
+def test_gate4_skip_zhiai_terminal_node() -> None:
+    """Gate 4: zhiai 末节点 (CRM 阶段最高) 不参与残缺判断.
+
+    zhiai 没有下一阶段可流转, "只有 self 循环" 是合法的非残缺状态.
+    旧 Gate 4 把 zhiai 误判残缺跳过写入, 导致 6/7~6/15 全部 8/9 天数据没进 CSV.
+    """
+    rows = [_row(crowd="zhiai", initial=243845, zhuanzhiai=243845)]  # 末节点只有 self
+    assert _check_partial_flow_rows(rows) == []  # 不应报残缺
+
+    # zhiai 即便完全没有自循环也不报 (initial>0 但无任何流转出去)
+    rows = [_row(crowd="zhiai", initial=243845)]
+    assert _check_partial_flow_rows(rows) == []
 
 
 def test_gate4_mixed_pass_and_fail() -> None:
