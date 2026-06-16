@@ -21,9 +21,7 @@ import shutil
 import subprocess
 
 # 2026-06-14 (P1-1 + P1-2): _strip_int 4 份重复 → core.validators 共享
-#                  _read_prev_row / _parse_date 在 items_validators 0 调用, 删 (走公共 parse_date)
 from core.validators import _strip_int  # noqa: F401  保留旧名, 内部已替换
-from core.utils.dates import parse_date as _parse_date  # noqa: F401  保留旧名, 内部已替换
 
 
 # ===========================================================================
