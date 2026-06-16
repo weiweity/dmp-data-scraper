@@ -8,7 +8,7 @@
 
 ### 1.1 想了解"现在项目长啥样"
 
-**❌ 不要**从头读 CHANGELOG.md (50+ 版本条目, 770+ 行, 信息密度低)。
+**❌ 不要**从头读 CHANGELOG.md (25+ 版本条目, 信息密度低)。
 
 **✅ 应该**:
 1. 读 `docs/maintenance/ARCHITECTURE.md` (10 分钟)

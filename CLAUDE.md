@@ -65,10 +65,10 @@ codegraph callers . read_account                  # 反向追踪
 |---|---|
 | 项目路径 | `/Users/hutou/Desktop/fuqin-date/fuqing-scraper` |
 | GitHub | `git@github.com:weiweity/dmp-data-scraper.git` |
-| 版本 | **v0.1.24** (2026-06-14) |
-| pytest | **113/113 passed** (v0.1.17 后 +24) |
-| 跑批业务 | data3.csv ~7200 行 (单品洞察, 每日) |
-| 索引统计 | 40 files / 566 nodes / 1573 edges (1.70 MB) |
+| 版本 | **v0.1.26** (2026-06-16) |
+| pytest | **128/128 passed** (v0.1.17 后 +39) |
+| 跑批业务 | data3.csv ~7269 行 (单品洞察, 每日) |
+| 索引统计 | 40 files / 566 nodes / 1573 edges (1.70 MB, 2026-06-14 同步) |
 
 > ⚠️ **本项目自包含**: 跟其他项目无 import / 调度 / 配置依赖。
 
@@ -132,7 +132,7 @@ cd /Users/hutou/Desktop/fuqin\-date/fuqing-scraper
 pip install playwright pyyaml
 playwright install chromium
 
-# 跑测试 (113/113 passed)
+# 跑测试 (128/128 passed)
 PYTHONPATH=. pytest core/tests/ -v
 
 # 一键启动 (项目根)
@@ -167,7 +167,7 @@ BACKFILL_DAYS=30 ./run.sh -i     # 历史回填 30 天
 ```bash
 # 1. 验证 pytest
 PYTHONPATH=. pytest core/tests/ -v
-# 期望: 113 passed
+# 期望: 128 passed (v0.1.25 加 15 个 Gate 4 测试)
 
 # 2. 验证 ruff lint
 ruff check core/
@@ -176,7 +176,7 @@ ruff check core/
 ls -la chrome_profile/Default/Cookies  # 应 < 30 天 modified
 
 # 4. 验证数据完整性
-wc -l core/data3.csv                       # 应 ≥ 7000 行
+wc -l core/data3.csv                       # 应 ≥ 7200 行
 ```
 
 ---

@@ -1,14 +1,14 @@
 # fuqing-scraper (芙清 DMP 数据采集)
 
 > 达摩盘 SPA 自动抓数, 独立 git repo
-> **v0.1.24** (2026-06-14)
+> **v0.1.26** (2026-06-16)
 
 独立 git repo, 22 模块拆分, **只负责爬虫 + 生成数据**, 跟其他项目无依赖。
 
 - **项目路径**: `/Users/hutou/Desktop/fuqin-date/fuqing-scraper`
 - **GitHub**: `git@github.com:weiweity/dmp-data-scraper.git`
-- **pytest**: **113/113 passed** (v0.1.17 后加 24 个 P1 测试)
-- **跑批业务**: data3.csv ~7200 行 (单品洞察, 每日)
+- **pytest**: **128/128 passed** (v0.1.17 后 +39 测试)
+- **跑批业务**: data3.csv ~7269 行 (单品洞察, 每日)
 
 ## 三大数据产品
 
@@ -24,7 +24,7 @@
 cd /Users/hutou/Desktop/fuqin\-date/fuqing-scraper
 pip install playwright pyyaml
 playwright install chromium
-PYTHONPATH=. pytest core/tests/ -v   # 113/113 passed
+PYTHONPATH=. pytest core/tests/ -v   # 128/128 passed
 cd core
 python3 dmp_master.py --items  # 单品洞察
 T_OFFSET=2 python3 dmp_master.py --items  # 早 9:00 (T-2)
@@ -34,9 +34,9 @@ T_OFFSET=1 python3 dmp_master.py --items  # 下午 16:00 (T-1)
 ## 验证
 
 ```bash
-PYTHONPATH=. pytest core/tests/ -v   # 113/113 passed
+PYTHONPATH=. pytest core/tests/ -v   # 128/128 passed
 ruff check core/
-wc -l core/data3.csv               # ≥ 7000 行
+wc -l core/data3.csv               # ≥ 7200 行
 ```
 
 ## 目录结构 (22 模块)
@@ -59,7 +59,7 @@ core/ - dmp_master.py + dmp_common.py + dmp_scraper.py + dmp_flow_scraper.py
 
 - 项目结构 / 数据流 / 不变量 → `docs/maintenance/ARCHITECTURE.md`
 - 跑批失败排查 → `docs/maintenance/HOW-TO-FIX.md`
-- 今天 4 个 fix 的根因 → `docs/maintenance/LESSONS.md`
+- v0.1.19-v0.1.23 4 个 fix 的根因 → `docs/maintenance/LESSONS.md`
 - CHANGELOG 怎么读 + 怎么写 → `docs/maintenance/CHANGELOG-GUIDE.md`
 
 ## GitHub

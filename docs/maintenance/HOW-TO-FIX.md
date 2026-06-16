@@ -15,7 +15,7 @@
   ↓
 [3] 看 .learnings/ERRORS.md ERR-* 历史
   ↓
-[4] 如果没解决,看 docs/maintenance/LESSONS.md (今天 4 个 fix 的排查路径)
+[4] 如果没解决,看 docs/maintenance/LESSONS.md (v0.1.19-v0.1.23 4 个 fix 的排查路径)
   ↓
 [5] 复现: PYTHONPATH=. pytest core/tests/ -v + 跑单个 scraper
   ↓
@@ -118,7 +118,7 @@ cd /Users/hutou/Desktop/fuqin-date/fuqing-scraper
 PYTHONPATH=. pytest core/tests/ -v
 ```
 
-**期望**: 108/108 passed (v0.1.17 后, 加了 19 个 P1 测试)。
+**期望**: 128/128 passed (v0.1.17 后, 加 39 个 P1 + Gate 4 测试)。
 
 **单跑 1 个**:
 ```bash
