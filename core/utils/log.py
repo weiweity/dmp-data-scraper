@@ -15,8 +15,9 @@ LOG_FILE = os.path.join(LOG_DIR, f'dmp_run_{datetime.now().strftime("%Y%m%d")}.l
 # 模块加载时一次性创建目录, 避免每次 log() 调用都执行 os.makedirs
 try:
     os.makedirs(LOG_DIR, exist_ok=True)
-except Exception:
-    pass  # 创建失败不影响后续 log() 兜底
+except Exception as e:
+    # best-effort: 目录创建失败不致命 (log() 仍可走 stdout), 但要可见
+    print(f"WARNING: log dir init failed ({type(e).__name__}: {e}), 仅 stdout 日志", flush=True)
 
 
 def log(msg):
@@ -26,5 +27,11 @@ def log(msg):
     try:
         with open(LOG_FILE, 'a', encoding='utf-8') as f:
             f.write(f"[{now}] {msg}\n")
-    except Exception:
-        pass
+    except Exception as e:
+        # best-effort: 文件写失败不致命 (print 已输出), 但要可见
+        # 仅每 ~50 次警告一次避免刷屏
+        if not hasattr(log, "_file_err_count"):
+            log._file_err_count = 0
+        log._file_err_count += 1
+        if log._file_err_count == 1 or log._file_err_count % 50 == 0:
+            print(f"WARNING: log file write failed ({type(e).__name__}: {e}), 仅 stdout 日志 [累计 {log._file_err_count} 次]", flush=True)
