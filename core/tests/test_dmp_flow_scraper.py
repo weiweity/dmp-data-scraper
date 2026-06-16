@@ -295,3 +295,61 @@ def test_click_xinzeng_tab_handles_ok_false() -> None:
 
     assert result == {"ok": False}
     # 不重试 / 不抛异常 (调用方负责降级到 page.goto)
+
+
+# ========== append_flow_to_csv 日期格式去重 (v0.1.14 漏修) ==========
+
+import csv as _csv_stdlib
+import tempfile as _tempfile
+from core.dmp_flow_scraper import append_flow_to_csv
+
+
+def _make_flow_data(initial: int = 1000) -> dict:
+    """构造合法 flow_data (8 个 crowd, 不触发 Gate 4)."""
+    return {crowd: {"initial": initial, "faxian": 100, "zhongcao": 100, "hudong": 100,
+                    "xingdong": 100, "shougou": 100, "fugou": 0, "zhiai": 0, "xinzeng": 0}
+            for crowd in ("faxian", "zhongcao", "hudong", "xingdong", "shougou",
+                          "fugou", "zhiai", "xinzeng")}
+
+
+def test_append_flow_to_csv_dedup_legacy_unpadded_format() -> None:
+    """append_flow_to_csv: CSV 含旧格式 `2026/6/7` (无零填充) + 新格式 `2026/06/07` 共存时, 按日期对象去重不重复.
+
+    2026-06-17 修复: v0.1.14 修了 dmp_item_insight_scraper 的 date 格式但漏了 dmp_flow_scraper.append_flow_to_csv.
+    旧逻辑 `row.get('date') != date_str` 是字符串比较, 两种格式不等 → 重复行.
+    """
+    with _tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False, encoding='utf-8') as f:
+        writer = _csv_stdlib.writer(f)
+        writer.writerow(['date', 'crowd', 'initial', 'zhuanfaxian', 'zhuanzhongcao',
+                         'zhuanhudong', 'zhuanxingdong', 'zhuanshougou', 'zhuanfugou', 'zhuanzhiai'])
+        # 旧格式: 2026/6/7 (无零填充)
+        for crowd in ("faxian", "zhongcao", "hudong", "xingdong", "shougou", "fugou", "zhiai", "xinzeng"):
+            writer.writerow(["2026/6/7", crowd, 1000, 500, 100, 0, 0, 0, 0, 0])
+        csv_path = f.name
+
+    # 新格式写入: 2026/06/07 (零填充, 来自 format_date_for_csv)
+    append_flow_to_csv(csv_path, "2026/06/07", _make_flow_data(initial=2000))
+
+    # 验证: 6/7 仍只有 8 行, 不重复
+    with open(csv_path, encoding='utf-8') as f:
+        reader = _csv_stdlib.DictReader(f)
+        rows_6_7 = [r for r in reader if r['date'] in ("2026/6/7", "2026/06/07")]
+    assert len(rows_6_7) == 8, f"6/7 应有 8 行 (按日期对象去重), 实际 {len(rows_6_7)} 行"
+
+
+def test_append_flow_to_csv_dedup_zero_padded_format() -> None:
+    """append_flow_to_csv: CSV 含零填充格式 `2026/06/07`, 再写入同日期零填充 → 去重不重复."""
+    with _tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False, encoding='utf-8') as f:
+        writer = _csv_stdlib.writer(f)
+        writer.writerow(['date', 'crowd', 'initial', 'zhuanfaxian', 'zhuanzhongcao',
+                         'zhuanhudong', 'zhuanxingdong', 'zhuanshougou', 'zhuanfugou', 'zhuanzhiai'])
+        for crowd in ("faxian", "zhongcao", "hudong", "xingdong", "shougou", "fugou", "zhiai", "xinzeng"):
+            writer.writerow(["2026/06/07", crowd, 1000, 500, 100, 0, 0, 0, 0, 0])
+        csv_path = f.name
+
+    append_flow_to_csv(csv_path, "2026/06/07", _make_flow_data(initial=2000))
+
+    with open(csv_path, encoding='utf-8') as f:
+        reader = _csv_stdlib.DictReader(f)
+        rows_6_7 = [r for r in reader if r['date'] in ("2026/6/7", "2026/06/07")]
+    assert len(rows_6_7) == 8, f"6/7 应有 8 行, 实际 {len(rows_6_7)} 行"

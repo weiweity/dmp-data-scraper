@@ -22,6 +22,7 @@ from core.dmp_common import (
     login_qianniu,
     read_account,
 )
+from core.utils.dates import parse_date
 
 # statusId → crowd key 映射
 STATUS_TO_KEY = {
@@ -729,8 +730,13 @@ def append_flow_to_csv(csv_file, date_str, flow_data):
     if os.path.exists(csv_file):
         with open(csv_file, 'r', encoding=encoding) as f:
             reader = csv.DictReader(f)
+            # 2026-06-17 修复 (v0.1.14 漏修): 按日期对象去重, 不是字符串比较
+            # 旧逻辑 `row.get('date') != date_str` 在 CSV 历史无零填充 (2026/6/7) +
+            # 新写入零填充 (2026/06/07) 共存时, 字符串不等 → 不去重 → 重复行.
+            # parse_date 同时支持两种格式 (strptime 宽松 %Y/%m/%d), 用 date 对象比较.
+            target_date = parse_date(date_str)
             for row in reader:
-                if row.get('date') != date_str:
+                if parse_date(row.get('date', '')) != target_date:
                     existing_rows.append(row)
 
     crowds = CROWD_ORDER
