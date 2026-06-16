@@ -431,10 +431,14 @@ sorted(dates)  # ['2026/5/1', '2026/5/10', '2026/5/11', ...'2026/5/19', '2026/5/
 **Logged**: 2026-06-16T22:15:00Z
 **Priority**: high
 **Status**: in-progress (fix on branch `fix/xinzeng-click-2026-06-16`, 待真实 DMP 验证)
-**Area**: scraper/dmp-spa
+**Area**: scraper/dmp-spa + scraper/auth
 
 ### Summary
-用户报告: xinzeng (statusId=0) DMP API 只在"先随机点一个 tab, 再点 xinzeng tab"时触发. page.goto + statusId=0 不触发. 待验证.
+**两个独立 bug** (Playwright 单测证实):
+1. **xinzeng API click 触发**: `page.goto + statusId=0` 不触发 DMP transfer API, 必须 click '新增' tab. 修复: `click_xinzeng_tab` + tab 顺序倒置 (Fix 5 in LESSONS.md)
+2. **check_dmp_session 反安全 timeout 逻辑**: Sprint 19+ #141 设计"3 次 API timeout → 信任 cookie", 但 cookie 失效时 fetch API 必然失败, 信任 cookie = scraper 浪费跑批. 6/16 跑批 chrome_profile/Cookies 实际失效, scraper 浪费 90s × 9 天 写 0 行. 修复: 保守 return False 触发重登.
+
+**真实 DMP 验证状态**: 6/16 23:18 跑批日志显示 click_xinzeng_tab 全部 `{ok: False}` (找不到 '新增' tab), 截图证实 DMP 8 秒后被重定向 `login.html` — 根因是 cookie 失效 (bug 2) 而非 click_xinzeng_tab (bug 1). 修复 bug 2 后, 用户重新登录 chrome_profile 再跑批, 才能验证 bug 1 修复.
 
 ### Root Cause (代码侧分析, 待真实 DMP 确认)
 DMP 是 SPA 应用. `page.goto + statusId=0` 是"裸 URL 访问", SPA 路由上下文未建立 (其他 statusId 是 SPA 已激活状态下的 navigate, 触发 DMP 后端 transfer API; statusId=0 是 SPA 初始状态, 后端不返回 transfer 数据). 需要先访问其他 7 个 tab 建立 SPA 上下文, 再 click '新增' tab 触发 transfer.

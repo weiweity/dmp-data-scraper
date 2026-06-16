@@ -216,7 +216,42 @@ for status_id, crowd_name in zip(all_status_ids, all_crowd_names):
 
 ---
 
-## 跨 5 个 fix 的共同教训
+## Fix 6: v0.1.29 — check_dmp_session 反安全 timeout 逻辑 (ERR-20260616-006 子 bug, 与 Fix 5 同事件)
+
+**症状**: 6/16 跑批 (Fix 5 验证) 时, scraper 全部 0 行, click_xinzeng_tab 全部 `{ok: False}`. 截图 `/tmp/test_goto_dmp.png` 显示 DMP 8 秒后重定向 `login.html`. 但 check_dmp_session 日志说"3 次 API 调用均无明确结果，**默认相信 cookie 有效**", scraper 进 scraper 浪费 90s × 9 天.
+
+**根因** (2 层):
+1. **chrome_profile/Cookies 实际失效**: DMP 后端对老 session 拒绝服务, 8 秒后强制 redirect login.html. 这是用户层问题 (cookie 过期), 不是代码问题.
+2. **check_dmp_session 反安全逻辑**: Sprint 19+ #141 设计"3 次 API timeout → 信任 cookie" (当时认为 timeout = 网络抖动). 现实踩坑: cookie 失效时 fetch API 必然异常, "信任 cookie" = scraper 浪费跑批. 错误假设.
+
+**修复** (1): check_dmp_session 保守化
+```python
+# 旧 (Sprint 19+ #141)
+if is_login is None:
+    log(f"...默认相信 cookie 有效")
+    return True  # 反安全: 浪费 90s × N 天
+
+# 新 (Fix 6)
+if is_login is None:
+    log(f"...保守视为失效，需重新登录")
+    return False  # 宁可重登一次, 不浪费一天跑批
+```
+
+**修复** (2): 测试同步翻转
+- `test_check_dmp_session_api_timeout`: True → False
+- `test_check_dmp_session_all_timeout_returns_true` → `..._returns_false` (重命名)
+- `test_check_dmp_session_custom_max_retries`: True → False
+
+**防退化**:
+- **API timeout = cookie 失效 (主因) ≠ 网络抖动 (罕见)**: 反 Sprint 19+ #141 "信任 cookie" 设计
+- **跑批失败先看截图**: 日志说"check_dmp_session 3 次 timeout 默认信任" 看起来正常, 但截图直接显示 redirect login.html. 看截图比看日志快.
+- **scraper 入口必须有 fail-fast**: check_dmp_session 返回 False 立即中止, 不要进 scraper 后才发现 cookie 失效
+
+**Lesson**: Sprint 19+ #141 的设计意图 ("避免误判重登") 与现实 ("cookie 失效时 scraper 浪费跑批") 矛盾. 设计"信任"假设时必须考虑"最坏情况是什么", 不能只看 "常见情况是什么".
+
+---
+
+## 跨 6 个 fix 的共同教训
 
 | 教训 | 应用场景 |
 |---|---|
@@ -230,6 +265,8 @@ for status_id, crowd_name in zip(all_status_ids, all_crowd_names):
 | **SPA 初始状态 tab 用 click, 不用 page.goto** | 任何 SPA 应用 statusId=0 / 路由初始状态 (DMP / React / Vue) |
 | **tab 顺序: 初始状态 tab 放最后** | 任何"逐个访问 X tab" + SPA 异步 API 场景 |
 | **降级路径必须保留** | 任何 evaluate-click 找不到时降级到 page.goto + DOM fallback |
+| **check_dmp_session: API timeout → 视为失效 (保守)** | 反 Sprint 19+ #141 设计. 旧 "timeout → 信任 cookie" 让 scraper 浪费 90s × N 天 |
+| **跑批失败必须先看截图, 不要只看日志** | del/api_flow_*.png 截图能直接看出页面是否真到目标页 |
 
 ---
 

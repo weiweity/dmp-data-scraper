@@ -4,6 +4,30 @@
 
 ---
 
+## [v0.1.29] - 2026-06-16 - fix(common): check_dmp_session 反安全 timeout 逻辑 (ERR-20260616-006 子 bug)
+
+### 背景
+Playwright 单测 (`/tmp/test_goto_dmp.png`) 证实 6/16 跑批 chrome_profile/Cookies 实际失效, DMP 8 秒后强制重定向 `login.html`. 但 `check_dmp_session` 3 次 API timeout 后"默认相信 cookie 有效" → scraper 进 scraper 浪费 90s × 9 天, 写 0 行. Sprint 19+ #141 设计决策错位: 当时认为 "3 次 API 异常 = 网络抖动", 实际 "3 次异常 = cookie 失效" 才是主因.
+
+### Fixed
+- **core/dmp_common.py:427-435**: `if is_login is None: return True` → `return False`. 保守策略: 3 次 API timeout 视为失效, 触发重登流程 (宁可重登一次, 不浪费一天跑批).
+- **core/tests/test_dmp_common.py**: `test_check_dmp_session_api_timeout` 期望 True → False
+- **core/tests/test_check_dmp_session.py**: `test_check_dmp_session_all_timeout_returns_true` → `..._returns_false` (重命名 + 期望 False) + `test_check_dmp_session_custom_max_retries` 期望 True → False
+
+### Verified
+- `PYTHONPATH=. pytest core/tests/` → **136/136 passed**
+- 现实跑批证据: 6/16 23:18 scraper 浪费 90s × 2 天 (6/7+6/8) 写 0 行后中断
+
+### 反 Sprint 19+ #141 设计说明
+原设计意图 (避免误判触发不必要的重登) 与现实踩坑 (cookie 失效时 scraper 90s × N 天 浪费) 矛盾. 宁可重登一次, 不浪费一天跑批. 用户 review 时需确认.
+
+### Metadata
+- Related Files: `core/dmp_common.py:427-435`, `core/tests/test_dmp_common.py:52-62`, `core/tests/test_check_dmp_session.py:74-86, 138-149`
+- Tests: 136/136 (passed, 2 个 timeout 测试期望翻转)
+- 反 Sprint 19+ #141: 需用户 review 确认
+
+---
+
 ## [v0.1.28] - 2026-06-16 - fix(flow): xinzeng click 触发替代 page.goto (ERR-20260616-006, 待真实 DMP 验证)
 
 ### 背景
