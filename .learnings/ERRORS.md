@@ -383,5 +383,66 @@ sorted(dates)  # ['2026/5/1', '2026/5/10', '2026/5/11', ...'2026/5/19', '2026/5/
 ### 验证结果
 修复后 8/8 字段中有 7 个完美匹配截图值，Engage(种草)仍有偏差（离TOTAL太近被抢占了），后续可优化
 
+---
+
+## [ERR-20260616-005] `is_flow_data_stale` 全 0 误写入 (P0, 已修)
+
+**Logged**: 2026-06-16T22:15:00Z
+**Priority**: high
+**Status**: resolved (commit pending)
+**Area**: scraper/logic
+
+### Summary
+22:10 START.sh 跑批, 抓 6/7 时 DMP API 返回全 0 (推测 DMP 后端对 ≥8 天前的日期返回空, 或 SPA 导航问题). `is_flow_data_stale()` 在所有 crowd initial=0 时返回 False (旧逻辑: "没有有效人群时不算陈旧, 让数据正常写入"), 导致 6/7 8 行全 0 写入 data.csv.
+
+### Symptom
+- `core/data.csv` 出现 2026/06/07 全 0 8 行 (curl 看每行都是 `0,0,0,0,0,0,0,0,0`)
+- is_flow_data_stale(全 0) 期望 True (跳过), 实际 False (写入)
+
+### Root Cause
+`core/dmp_flow_scraper.py:619` `if not has_valid_crowd: return False` 是文档化的逻辑错误. 注释说"让数据正常写入",但 all-zero 数据**根本不是正常数据** (是 API 没加载). 当 scraper 失败时 (page.goto 没触发 SPA 状态切换, 或 DMP 对老日期返回空), 拦截器拿到空 dict, 旧逻辑放行 → 写入垃圾.
+
+**同时 Gate 4 (`_check_partial_flow_rows`) 也跳过 all-zero**: `if initial <= 0: continue` 直接 continue, 没机会报残缺. 两层 gate 都对 all-zero 失明.
+
+### Fix
+1. `core/dmp_flow_scraper.py:619` `return False` → `return True`: all-zero 当 stale 处理, append_flow_to_csv 跳过写入
+2. 加 4 个 regression test (`core/tests/test_dmp_flow_scraper.py`):
+   - `test_is_flow_data_stale_all_zero_returns_true` (red → green)
+   - `test_is_flow_data_stale_xinzeng_only_returns_false` (反向 case)
+   - `test_is_flow_data_stale_real_data_with_movement_returns_false`
+   - `test_is_flow_data_stale_self_only_stale_returns_true`
+3. 清理 `core/data.csv` 中已写入的 6/7 全 0 行 (8 行)
+
+### Verified
+- `PYTHONPATH=. pytest core/tests/test_dmp_flow_scraper.py` → 19/19 passed
+- `PYTHONPATH=. pytest core/tests/` → 132/132 passed
+
+### 未解之谜 (待后续)
+用户报告: xinzeng (statusId=0) 的 DMP API 需要"先随机点一个 tab, 再点 xinzeng"才会触发. 怀疑 SPA 路由对 page.goto + statusId=0 的处理有特殊行为, click 触发比 navigate 更可靠. **本 PR 不修复** (需要交互式调试 + 真实 DMP 验证). 记录到 ERR-20260616-006 (TODO).
+
+### Metadata
+- Related Files: `core/dmp_flow_scraper.py`, `core/tests/test_dmp_flow_scraper.py`, `core/data.csv`
+- Tests: 132/132 (was 128 + 4 new)
+
+---
+
+## [ERR-20260616-006] xinzeng API 需 click 触发 (TODO, 未修)
+
+**Logged**: 2026-06-16T22:15:00Z
+**Priority**: high
+**Status**: open (需要交互式调试)
+**Area**: scraper/dmp-spa
+
+### Summary
+用户报告: xinzeng (statusId=0) DMP API 只在"先随机点一个 tab, 再点 xinzeng tab"时触发. page.goto + statusId=0 不触发. 待验证.
+
+### TODO
+1. 加临时日志看 xinzeng tab 是否在 page.goto 后真的渲染了 sankey 图
+2. 试试 click(`[id^="deeplink-tab-xinzeng"]` 或类似) 替代 page.goto
+3. 验证修复后 6/13+ 数据是否恢复正常 (不只是 self)
+
+### Metadata
+- Related Files: `core/dmp_flow_scraper.py:472-474` (page.goto xinzeng tab)
+
 ### Metadata
 - Related Files: core/dmp_scraper.py

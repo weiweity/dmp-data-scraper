@@ -8,6 +8,7 @@ from core.dmp_flow_scraper import (
     _FLOW_TRANSFER_FIELDS,
     _check_partial_flow_rows,
     _to_int,
+    is_flow_data_stale,
 )
 
 # ========== _to_int ==========
@@ -163,3 +164,52 @@ def test_flow_transfer_fields_count() -> None:
     assert len(_FLOW_TRANSFER_FIELDS) == 7
     assert "initial" not in _FLOW_TRANSFER_FIELDS
     assert "xinzeng" not in _FLOW_TRANSFER_FIELDS  # xinzeng 不在 zhuan* 列
+
+
+# ========== is_flow_data_stale 全 0 边界 (防 6/7 全 0 误写入) ==========
+
+def _all_zero_flow_data() -> dict:
+    """构造一个所有 crowd initial=0 + 所有 transfer=0 的 flow_data (模拟 API 没加载)."""
+    keys = ("initial", "faxian", "zhongcao", "hudong", "xingdong", "shougou", "fugou", "zhiai", "xinzeng")
+    return {c: dict.fromkeys(keys, 0) for c in ("faxian", "zhongcao", "hudong", "xingdong", "shougou", "fugou", "zhiai", "xinzeng")}
+
+
+def test_is_flow_data_stale_all_zero_returns_true() -> None:
+    """is_flow_data_stale: 全部 initial=0 (API 没加载) → 必须 True (跳过写入).
+
+    背景: 2026-06-16 22:10 run 抓 6/7, API 返回全 0, is_flow_data_stale 返回 False (旧逻辑),
+    导致 6/7 8 行全 0 写入 data.csv. 这是 P0 bug.
+    """
+    assert is_flow_data_stale(_all_zero_flow_data()) is True
+
+
+def test_is_flow_data_stale_xinzeng_only_returns_false() -> None:
+    """is_flow_data_stale: 只有 xinzeng initial > 0 → False (有新增数据).
+
+    反向 case: xinzeng initial > 0 视为有新增, 不算陈旧.
+    """
+    data = _all_zero_flow_data()
+    data["xinzeng"]["initial"] = 100
+    assert is_flow_data_stale(data) is False
+
+
+def test_is_flow_data_stale_real_data_with_movement_returns_false() -> None:
+    """is_flow_data_stale: 有初始值 + 有真实流转 → False (新鲜数据).
+
+    反向 case: 模拟 6/15 抓到 faxian initial=11.9M + self=23.9M (有变化).
+    """
+    data = _all_zero_flow_data()
+    data["faxian"]["initial"] = 11969651
+    data["faxian"]["faxian"] = 23939302  # self != 0, 算真实流转
+    assert is_flow_data_stale(data) is False
+
+
+def test_is_flow_data_stale_self_only_stale_returns_true() -> None:
+    """is_flow_data_stale: 有 initial 但 self=initial + 跨阶段全 0 (陈旧复制) → True.
+
+    反向 case: 验证 Gate 3 之前的核心 case (DMP 复制日).
+    """
+    data = _all_zero_flow_data()
+    data["faxian"]["initial"] = 11000601
+    data["faxian"]["faxian"] = 11000601  # self == initial, 没跨阶段流转
+    assert is_flow_data_stale(data) is True

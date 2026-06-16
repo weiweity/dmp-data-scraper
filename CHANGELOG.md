@@ -4,6 +4,44 @@
 
 ---
 
+## [v0.1.27] - 2026-06-16 - fix(flow): is_flow_data_stale 全 0 误写入 (ERR-20260616-005)
+
+### 背景
+2026-06-16 22:10 跑批时, START.sh 抓 6/7 数据, DMP API 返回全 0 (推测 DMP 后端对 ≥8 天前的日期返回空, 或 SPA 导航没触发). `is_flow_data_stale()` 在所有 crowd initial=0 时返回 False (旧逻辑: "没有有效人群时不算陈旧, 让数据正常写入"), 导致 6/7 8 行全 0 写入 data.csv. **Gate 4 (`_check_partial_flow_rows`) 同样跳过 all-zero** (`if initial <= 0: continue`), 两层 gate 都对 all-zero 失明.
+
+### Fixed
+- **core/dmp_flow_scraper.py:619**: `if not has_valid_crowd: return False` → `return True`. all-zero 数据 (API 没加载) 现在被当 stale 处理, append_flow_to_csv 跳过写入. **Gate 3 (实质相同) 之前漏过这种场景**: 旧逻辑的注释"让数据正常写入"是文档错误, all-zero **不是正常数据**.
+- **core/data.csv**: 清理已写入的 6/7 全 0 行 (8 行)
+- **.learnings/ERRORS.md**: 加 ERR-20260616-005 (已修) + ERR-20260616-006 (TODO, xinzeng click 触发)
+
+### Added
+- **core/tests/test_dmp_flow_scraper.py** +4 tests:
+  - `test_is_flow_data_stale_all_zero_returns_true` (P0 回归: 6/7 场景)
+  - `test_is_flow_data_stale_xinzeng_only_returns_false` (反向: xinzeng 有数据)
+  - `test_is_flow_data_stale_real_data_with_movement_returns_false` (反向: 真实流转)
+  - `test_is_flow_data_stale_self_only_stale_returns_true` (反向: DMP 复制日)
+
+### 未解
+- **xinzeng API 需 click 触发** (ERR-20260616-006): 用户报告 xinzeng 触发需"先随机点 tab, 再点 xinzeng". 本 PR 不修, 待交互式调试 + 真实 DMP 验证. 推测 SPA 路由对 page.goto + statusId=0 有特殊行为.
+- 6/8, 6/13, 6/14, 6/15 仍未补 (因为 DMP 6/13+ transfer API 行为待确认 + xinzeng click 问题)
+
+### 验证
+- `PYTHONPATH=. pytest core/tests/` → **132/132 passed** (128 旧 + 4 新)
+- `ruff check core/dmp_flow_scraper.py core/tests/test_dmp_flow_scraper.py` → All checks passed
+- 6/7 CSV 行: 2345 → 2337 (-8 行全 0)
+
+### Lesson
+- **Stale 判断的"没有有效人群 = 不算陈旧"是反直觉**: 旧代码以为"没数据 = 没东西可比 = 不算陈旧",但实际"没数据 = scraper 失败 = 不该写". 注释和实现要一致.
+- **防御性 Gate 应该多层覆盖**: Gate 4 (initial>0 + 部分) 和 Gate (all-zero) 是不同场景,需要独立检测. 这次只修了 stale check, Gate 4 仍漏 all-zero (但 stale 先拦截, 不再触发 Gate 4 路径). 后续可加 Gate 5 显式处理.
+
+### Metadata
+- Related Files: `core/dmp_flow_scraper.py`, `core/tests/test_dmp_flow_scraper.py`, `core/data.csv`, `.learnings/ERRORS.md`
+- Net diff: 3 files + 1 docs, +143/-27 行
+
+---
+
+## [v0.1.26] - 2026-06-16 - chore(refactor): 清 4 件 P2 tech debt (CLAUDE.md §11)
+
 ## [v0.1.26] - 2026-06-16 - chore(refactor): 清 4 件 P2 tech debt (CLAUDE.md §11)
 
 ### 背景

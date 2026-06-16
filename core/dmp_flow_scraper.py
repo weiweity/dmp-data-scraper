@@ -615,9 +615,11 @@ def is_flow_data_stale(flow_data):
         if self_flow != initial or other_flows_sum > 0:
             return False
 
-    # 没有有效人群时，不算陈旧（让数据正常写入）
+    # 没有有效人群（all initial=0）= API 没加载到数据, 当陈旧处理
+    # 2026-06-16 修复: 旧逻辑 `return False` 会让 6/7 全 0 误写入 CSV (8 行空行)
+    # 现在 return True, append_flow_to_csv 会跳过写入 + 走 stale 分支
     if not has_valid_crowd:
-        return False
+        return True
 
     return True
 
