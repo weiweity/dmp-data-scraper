@@ -14,7 +14,7 @@
 | `core/data2.csv` | 资产诊断 | 每天 1 行 (TOTAL + 6 AIPL) | DOM 抓大数字 |
 | `core/data3.csv` | 单品洞察 | (日期, 商品) 15 商品 × 1 行/天 | API 拦截 + Date Sanity Check |
 
-> 7×24 累计 2352 + 152 + 7223 = 9727 行 (2026-06-14 截至),append-only,绝不覆盖。
+> 7×24 累计 (2026-06-16 截至): data.csv 2409 行 + data2.csv 777 行 + data3.csv 7269 行 = 10455 行, append-only, 绝不覆盖。
 
 ---
 
@@ -45,17 +45,17 @@ dmp_item_insight_scraper.fetch_item_data(item_id, date)
 
 ```
 core/
-├── dmp_master.py                 ← 统一入口 (--assets/--flow/--items)
-├── dmp_common.py                 ← 公共模块 (Config/BrowserManager/login/CSV 工具, 781 行 re-export shim)
-├── dmp_scraper.py                ← 资产诊断 (Y轴锚点 DOM 抓取, data2.csv)
-├── dmp_flow_scraper.py           ← 流转数据 (API 拦截 + statusId=0 DOM fallback, data.csv)
-├── dmp_item_insight_scraper.py   ← 单品洞察 (API 拦截 + Date Sanity Check, 3253 行)
+├── dmp_master.py                 ← 统一入口 (--assets/--flow/--items, 775 行)
+├── dmp_common.py                 ← 公共模块 (Config/BrowserManager/login/CSV 工具, 788 行 re-export shim)
+├── dmp_scraper.py                ← 资产诊断 (Y轴锚点 DOM 抓取, data2.csv, 679 行)
+├── dmp_flow_scraper.py           ← 流转数据 (API 拦截 + statusId=0 DOM fallback, data.csv, 806 行)
+├── dmp_item_insight_scraper.py   ← 单品洞察 (API 拦截 + Date Sanity Check, 2454 行)
 ├── anti_detect.py                ← 反检测 (10 层防御)
 ├── sanity_check.py               ← 数据质量 (6 道门禁)
 ├── config/                       ← items.yaml + settings.py
 ├── utils/                        ← dates.py / account.py / log.py / t_offset.py / csv_state.py
 ├── validators/                   ← items/assets/flow 3 个 validator
-└── tests/                        ← conftest.py + 113 tests
+└── tests/                        ← conftest.py + 128 tests
 ```
 
 ### 3.1 dmp_master.py (入口,775 行)
@@ -69,7 +69,7 @@ core/
 
 **不要在 scraper 里加 if __name__ == '__main__'** — 旧版 dmp_common.py 早期有过独立入口,新代码统一走 master.py。
 
-### 3.2 dmp_common.py (公共,781 行)
+### 3.2 dmp_common.py (公共,788 行)
 
 **re-export shim** — 内部定义:
 - `log(msg)` — 统一日志函数,带时间戳,追加 `del/dmp_run_YYYYMMDD.log`
@@ -84,7 +84,7 @@ core/
 
 **所有 scraper 都 `from dmp_common import X`** — 这是约定,别绕过。
 
-### 3.3 3 个 scraper (679 / 768 / 3253 行)
+### 3.3 3 个 scraper (679 / 806 / 2454 行)
 
 | 模块 | 数据流 | 关键函数 |
 |---|---|---|
@@ -169,7 +169,7 @@ END (with context manager 关浏览器)
 ## 8. 关联文档
 
 - `CLAUDE.md` — 全局 4 条准则 + 启动/验证/约束
-- `CHANGELOG.md` — 版本事件流 (v0.1.0~v0.1.23)
+- `CHANGELOG.md` — 版本事件流 (v0.1.0~v0.1.26)
 - `KB-数据采集-SPA接口拦截.md` — SPA 拦截方法论
 - `docs/maintenance/HOW-TO-FIX.md` — 怎么修 bug
 - `docs/maintenance/LESSONS.md` — 今天 4 个 fix 的教训
