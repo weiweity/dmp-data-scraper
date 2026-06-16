@@ -150,7 +150,73 @@ for attempt in range(max_wait):
 
 ---
 
-## 跨 4 个 fix 的共同教训
+## Fix 5: v0.1.28 — xinzeng click 触发替代 page.goto (ERR-20260616-006, 待真实 DMP 验证)
+
+**症状**: Fix 4 修了 reload + tab 顺序, 但 6/7~6/15 连续 9 天 xinzeng (新增) 数据全 0. ERR-005 (v0.1.27) 修了 stale check (all-zero 不写入), 但 xinzeng 仍持续 0, 说明 stale check 不是根因, transfer API 根本没拿到数据.
+
+**根因** (1 层, SPA 路由上下文):
+- DMP 是 SPA 应用. `page.goto + statusId=0` 是"裸 URL 访问", SPA 路由上下文未建立
+- DMP 后端需要 SPA 激活状态下的 tab 切换请求才返回 transfer 数据
+- page.goto 对其他 statusId 有效是因为 SPA 已被激活; statusId=0 是 SPA 初始状态, 后端不返回 transfer
+- 用户实测: "先随机点一个 tab, 再点 xinzeng tab" 才触发 → 暗示需要前置 SPA 激活 + 真实 click (而非 navigate)
+
+**修复** (1): 新增 `click_xinzeng_tab(page)` evaluate-click
+```python
+def click_xinzeng_tab(page):
+    """click DMP '新增' tab 触发 SPA transfer API."""
+    result = page.evaluate("""
+        () => {
+            const allEls = document.querySelectorAll('*');
+            for (const el of allEls) {
+                const text = (el.innerText || el.textContent || '').trim();
+                if (text !== '新增') continue;  // 精确匹配, 避免 '新增流转'
+                const rect = el.getBoundingClientRect();
+                if (rect.width === 0 || rect.height === 0) continue;
+                if (rect.left < 200) continue;  // tab 通常在左侧
+                el.click();
+                return { ok: true, top: rect.top, left: rect.left, text };
+            }
+            return { ok: false };
+        }
+    """)
+    return result
+```
+
+**修复** (2, 关键): tab 顺序反转 (Fix 4 的反向操作)
+```python
+# 旧 (Fix 4 改的, statusId=0 首位)
+all_status_ids = [0, 2001, 2002, 2003, 2004, 2006, 2007, 2008]
+
+# 新 (Fix 5, statusId=0 末尾, 让前置 7 个 page.goto 建立 SPA 路由上下文)
+all_status_ids = [2001, 2002, 2003, 2004, 2006, 2007, 2008, 0]
+```
+
+**修复** (3): 主循环 xinzeng 用 click 替代 page.goto
+```python
+for status_id, crowd_name in zip(all_status_ids, all_crowd_names):
+    if status_id == 0:
+        click_result = click_xinzeng_tab(page)
+        if not click_result.get('ok'):
+            # 降级到 page.goto (旧方案)
+            page.goto(xinzeng_url, wait_until="domcontentloaded", timeout=60000)
+    else:
+        page.goto(tab_url, wait_until="domcontentloaded", timeout=60000)
+```
+
+**修复** (4): 兜底 click 重试
+- 60s 轮询失败时, click_xinzeng_tab 重试一次, 仍失败降级 page.goto + DOM fallback
+
+**防退化**:
+- **SPA 初始状态用 click, 不用 page.goto**: page.goto 仅在 SPA 已激活状态下有效; 初始状态 tab 必须用真实 click 触发
+- **tab 顺序与 SPA 路由上下文**: 前置 tab 的 page.goto 帮助建立 SPA 路由上下文, 此时再 click 初始状态才触发. tab 顺序敏感, 反转 (Fix 4 → Fix 5) 触发完全不同的行为
+- **降级路径要保留**: click_xinzeng_tab 找不到 '新增' tab 时降级到 page.goto + DOM fallback, 双重防御
+- **JS 防退化测试**: 测试断言 JS 字符串含 '新增' + el.click() + rect.left 过滤 + getBoundingClientRect, 防止未来 PR 误删关键条件
+
+**Lesson**: SPA 应用 (DMP / 任何 React/Vue SPA) 对状态 0 / 初始状态 的 page.goto 处理与用户实际操作有差异. 通用规则: 自动化场景用真实 click 触发初始状态 tab. 这条对所有 SPA 自动化 (不是 DMP 独有) 都适用.
+
+---
+
+## 跨 5 个 fix 的共同教训
 
 | 教训 | 应用场景 |
 |---|---|
@@ -161,6 +227,9 @@ for attempt in range(max_wait):
 | **SPA 场景用 page.goto 不用 page.reload** | 任何 DMP 内部页面切换 |
 | **多 tab 顺序: 慢的放第一个** | 任何"逐个访问 X tab 抓数据" |
 | **抽纯函数 + 加测试** | 任何 if/else 复杂判断 (Date Sanity) |
+| **SPA 初始状态 tab 用 click, 不用 page.goto** | 任何 SPA 应用 statusId=0 / 路由初始状态 (DMP / React / Vue) |
+| **tab 顺序: 初始状态 tab 放最后** | 任何"逐个访问 X tab" + SPA 异步 API 场景 |
+| **降级路径必须保留** | 任何 evaluate-click 找不到时降级到 page.goto + DOM fallback |
 
 ---
 
@@ -170,7 +239,7 @@ for attempt in range(max_wait):
 
 - [ ] 看 `core/dmp_common.py` 顶部 16 个 re-export 表面, 心里有数
 - [ ] 看 `core/dmp_item_insight_scraper.py:_check_spa_date_match`, 知道怎么验日期
-- [ ] 看 `core/dmp_flow_scraper.py` 的 `all_status_ids` 顺序, 知道 xinzeng 在首位
+- [ ] 看 `core/dmp_flow_scraper.py` 的 `all_status_ids` 顺序 + `click_xinzeng_tab`, 知道 xinzeng 在**末尾** (Fix 5 反转), 用 click 触发而非 page.goto (ERR-20260616-006)
 - [ ] 看 `core/run.sh` / `START.sh`, 知道有 `-m/-s/-t/-b` 4 个新选项
 - [ ] 跑 `./START.sh -s` 看 data3.csv 状态, 验证环境 OK
 - [ ] 跑 `PYTHONPATH=. pytest core/tests/ -q` 看 128/128 passed
