@@ -333,15 +333,15 @@ print(f"Missing: {[d.isoformat() for d in missing]}")
 
 | 问题 | 为何跳过 | 重启时机 |
 |------|---------|---------|
-| `dmp_item_insight_scraper.py` 3246 行单文件拆 | 业务逻辑+DOM+日期+存储全纠缠, 拆错一个函数可能让 0/60 重现. 不知道每个函数的实际调用链. | 拆之前必须先写完整单测覆盖. 当前 103 测试不足以覆盖 3246 行. |
+| `dmp_item_insight_scraper.py` 2565 行单文件拆 (CLAUDE.md 写 3246 已过期) | 业务逻辑+DOM+日期+存储全纠缠, 拆错一个函数可能让 0/60 重现. 不知道每个函数的实际调用链. | 拆之前必须先写完整单测覆盖. 当前 128 测试不足以覆盖 2565 行. (2026-06-16 wc -l 验证实际 2565 行, CLAUDE.md §11 行数过期) |
 | 异常处理 4 种风格统一 (log-only / log+return / log+raise / bare pass) | `except: pass` 在某处可能是 best-effort cleanup (e.g., 关闭浏览器 IO 失败). 改 log 反而引入新失败. 猜不出哪些是故意的. | 跑批时观察: 如果发现某个异常被吞掉导致后续崩溃, 单独 fix, 不批量统一. |
 | 三模块 retry 策略统一 (items 60s / assets 10-14-18s / flow 无) | 不懂哪种对业务最合理. 改错会让抓批更不稳定. | 让用户讲清每模块的"应该跑多久", 我才能调. |
-| `chrome_profile` basename vs 全路径混用 (`os.path.basename(self.config_obj.USER_DATA_DIR)`) | 可能是为了拿字符串当 folder name (Playwright 接受相对路径), 改成全路径可能错. 猜不到原意. | 让用户讲清 "basename" 是 Playwright 行为还是项目历史遗留. |
-| `_parse_date` / `_read_prev_row` 0 调用 (在 items_validators.py) | v0.1.16 已删. sanity_check.py 还在用 (3 调用), 不动. | — |
-| 4 处 bare `except: pass` (dmp_common:56, 71 / log.py:18, 29) | 同上, 可能是 best-effort cleanup. 不知道. | 观察 + 单独 fix. |
-| `dmp_flow_scraper.py` 的 `format_date_for_csv` 有条件分支 (USING_COMMON 三元) | 不懂 USING_COMMON 是什么, 不敢简化. | 同上. |
+| `chrome_profile` basename vs 全路径混用 (`os.path.basename(self.config_obj.USER_DATA_DIR)`) | 可能是为了拿字符串当 folder name (Playwright 接受相对路径), 改成全路径可能错. 猜不到原意. | ✅ **已清** (2026-06-16 commit 7aec1e6): USING_COMMON=False 分支删除后, ConfigAdapter 的 get('paths')/get('browser') 也成为死代码, 顺手删 os.path.basename 死调用 |
+| `_parse_date` / `_read_prev_row` 0 调用 (在 items_validators.py) | v0.1.16 已删. sanity_check.py 还在用 (3 调用), 不动. | ✅ **已清** (2026-06-16 commit 7b54989): 删 `_parse_date` 死 re-export, sanity_check.py 用自己的定义 (3 调用保留) |
+| 4 处 bare `except: pass` (dmp_common:56, 71 / log.py:18, 29) | 同上, 可能是 best-effort cleanup. 不知道. | ✅ **已清** (2026-06-16 commit 6867dfa): 加 print 警告 (throttle 50 次一次避免刷屏). best-effort 语义保留, 但 silent fail → visible |
+| `dmp_flow_scraper.py` 的 `format_date_for_csv` 有条件分支 (USING_COMMON 三元) | 不懂 USING_COMMON 是什么, 不敢简化. | ✅ **已清** (2026-06-16 commit 7aec1e6): USING_COMTERN 永远 True (dmp_master.py sys.path.insert + 测试用绝对 import). 删 21+ ternary + 52 行 fallback 定义 + 1 个死 buggy login_qianniu 包装 |
 | SPM 硬编码在 settings.py | 不懂 SPM 是什么, 不敢改. | 不知道. |
 
 ---
 
-*此文件由 AI 维护, 最后更新 2026-06-13 (scraper 项目彻底独立, 删 9 章节, 11→9 节)*
+*此文件由 AI 维护, 最后更新 2026-06-16 (Tech debt §11 P2 第 1/2/3/4 件清完: bare except + _parse_date + USING_COMTERN + chrome_profile basename. 剩 4 件: 大文件拆 / 异常处理 / retry 策略 / SPM 硬编码)*
