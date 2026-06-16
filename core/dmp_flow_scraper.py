@@ -621,6 +621,49 @@ def is_flow_data_stale(flow_data):
     return True
 
 
+# 7 个 zhuan* 流转列 (不包括 'initial'), 用于 Gate 4 残缺检测
+_FLOW_TRANSFER_FIELDS = (
+    'zhuanfaxian', 'zhuanzhongcao', 'zhuanhudong', 'zhuanxingdong',
+    'zhuanshougou', 'zhuanfugou', 'zhuanzhiai',
+)
+
+
+def _to_int(v):
+    """解析 int (兼容逗号格式和空值), 用于 Gate 4 等纯函数检测."""
+    if v is None:
+        return 0
+    s = str(v).strip()
+    return int(s.replace(',', '')) if s else 0
+
+
+def _check_partial_flow_rows(new_rows):
+    """Gate 4: 流转数据残缺检测 (2026-06-16 防御加固).
+
+    返回残缺人群描述列表 (空 = pass).
+    当 initial > 0 但非零流转列 <= 1 (只有 self 或全 0),
+    视为 DMP transfer API 部分返回 (T+2 缺失 / 跨阶段未抓到).
+
+    覆盖场景:
+    - DMP transfer API 只返回 self 1 个 item (不返回完整桑基图)
+    - T+2 抓取时 DMP 页面没有目标日期 (initial=0, 但仍可能有 self 残留)
+    - 防止 Gate 3 (实质相同) 拦不住的"残缺但不一致"数据写入
+
+    xinzeng 行不参与判断 (initial=0 是常态).
+    """
+    partial = []
+    for row in new_rows:
+        crowd = row.get('crowd', '')
+        if crowd == 'xinzeng':
+            continue
+        initial = _to_int(row.get('initial', 0))
+        if initial <= 0:
+            continue
+        non_zero = sum(1 for f in _FLOW_TRANSFER_FIELDS if _to_int(row.get(f, 0)) > 0)
+        if non_zero <= 1:
+            partial.append(f"{crowd}(initial={initial:,},非零列={non_zero})")
+    return partial
+
+
 def append_flow_to_csv(csv_file, date_str, flow_data):
     """追加流转数据到CSV"""
     fieldnames = ['date', 'crowd', 'initial', 'zhuanfaxian', 'zhuanzhongcao',
@@ -689,6 +732,14 @@ def append_flow_to_csv(csv_file, date_str, flow_data):
         if all_essentially_same and latest_by_crowd:
             log(f"⚠️ 流转 {date_str} 所有人群与上一天实质相同，判定为T+1未更新，跳过写入")
             return True
+
+    # ========== Gate 4: 流转数据残缺检测 (T+2 缺失 / 部分未抓取到) ===========
+    # 2026-06-16 防御加固: 当 initial > 0 但非零流转列 ≤ 1, 视为 DMP
+    # transfer API 只返回 self (不返回完整桑基图). 跳过整日写入 + 明确日志.
+    partial_crowds = _check_partial_flow_rows(new_rows)
+    if partial_crowds:
+        log(f"⚠️ 流转 {date_str} 未抓取到，跳过写入 (部分人群: {', '.join(partial_crowds)})")
+        return True
 
     all_rows = existing_rows + new_rows
     os.makedirs(os.path.dirname(csv_file) or '.', exist_ok=True)
