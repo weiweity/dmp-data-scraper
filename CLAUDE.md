@@ -38,7 +38,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## CodeGraph 索引 (MCP + CLI)
 
-项目已建索引 — **32 文件 / 486 节点 / 1367 边 / 1.45 MB, 索引耗时 155ms**。
+项目已建索引 — **36 文件 / 561 节点 / 1359 边 / 1.70 MB, 索引耗时 151ms (2026-06-17 sync)**。
 
 **MCP 工具** (Claude Code 内置, 写代码**前**查, **中**不查):
 - `codegraph_explore "<问题或符号>"` — 一次调用返回相关符号源码（首选, Read 等价）
@@ -53,7 +53,7 @@ codegraph explore . "check_dmp_session 业务层"     # 重点函数源码
 codegraph callers . read_account                  # 反向追踪
 ```
 
-**节点类型分布**: function 211 / import 111 / variable 71 / constant 30 / method 25 / class 7
+**节点类型分布**: function 294 / import 121 / variable 76 / file 39 / constant 30 / method 26
 
 ---
 
