@@ -257,27 +257,10 @@ wc -l core/data3.csv                       # 应 ≥ 7200 行
 | SPA 拦截方法论 | `KB-数据采集-SPA接口拦截.md` | Network 拦截核心知识 |
 | 经验日志 | `.learnings/LEARNINGS.md` | 技术发现 + 最佳实践 |
 | 错误日志 | `.learnings/ERRORS.md` | 已知错误 + 修复 |
-| 工作流指南 | `workflows/README.md` | 6 个 JS workflow 使用 |
 
 ---
 
-## 8. 工作流 (6 个 JS)
-
-```bash
-# 在 Claude Code 中运行 (路径已对齐本项目)
-Workflow({scriptPath: "workflows/dmp-daily-run.js"})      # 每日数据采集
-Workflow({scriptPath: "workflows/dmp-data-sync.js"})      # 数据同步
-Workflow({scriptPath: "workflows/dmp-data-fix.js"})       # 数据修复
-Workflow({scriptPath: "workflows/dmp-data-verify.js"})    # 数据验证
-Workflow({scriptPath: "workflows/dmp-monitor.js"})        # 监控告警
-Workflow({scriptPath: "workflows/dmp-optimization.js"})   # 优化执行
-```
-
-> ℹ️ 6 个 JS workflow 路径已统一对齐本项目 `/Users/hutou/Desktop/fuqin-date/fuqing-scraper/core/`。
-
----
-
-## 9. CodeGraph 暴露的技术债 (2026-06-13 识别)
+## 8. CodeGraph 暴露的技术债 (2026-06-13 识别)
 
 ### 🟡 P1: dmp_common.py 死代码 (~65 行)
 `core/dmp_common.py` 中 `read_account` 函数体在迁移到 `utils/account.py` 后未清理。按 §3 准则"提及即可, 不要删"。
